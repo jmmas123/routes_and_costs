@@ -2,16 +2,25 @@ import random
 from deap import base, creator, tools, algorithms
 import numpy as np
 
+# Optimization type: either "distance" or "cost"
+optimize_for = "cost"
+
 # Define delivery points (latitude, longitude)
 delivery_points = {
-    "Warehouse": (latitude_warehouse, longitude_warehouse),
-    "Store A": (latitude_A, longitude_A),
-    "Store B": (latitude_B, longitude_B),
-    "Store C": (latitude_C, longitude_C),
+    "PLISA": (13.814771381058584, -89.40960526517033),
+    "C1": (13.700334013638587, -89.19656792236255),
+    "C2": (13.699614129603189, -89.18805153457025),
+
 }
 
 # Number of points including the warehouse
 n_points = len(delivery_points)
+
+
+# Calculate geodesic distances (straight-line distances)
+distance_wa = geodesic(Warehouse, store_a).kilometers
+distance_ab = geodesic(store_a, store_b).kilometers
+distance_bc = geodesic(store_b, store_c).kilometers
 
 # Distance matrix (pairwise distances between points)
 distance_matrix = np.array([
@@ -28,7 +37,7 @@ auxiliary_cost_per_hour = 10  # Auxiliary personnel wage per hour
 average_speed_kmh = 60  # Assumed average speed in kilometers per hour
 
 # Genetic algorithm setup
-creator.create("FitnessMin", base.Fitness, weights=(-1.0,))  # Minimize the distance
+creator.create("FitnessMin", base.Fitness, weights=(-1.0,))  # Minimize fitness
 creator.create("Individual", list, fitness=creator.FitnessMin)
 
 toolbox = base.Toolbox()
@@ -37,21 +46,24 @@ toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.in
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 
-# Fitness function to evaluate total distance and calculate total cost for a route
+# Fitness function that calculates total cost or total distance
 def eval_route(individual):
     total_distance = distance_matrix[0, individual[0]]  # Start from warehouse
     for i in range(len(individual) - 1):
         total_distance += distance_matrix[individual[i], individual[i + 1]]
     total_distance += distance_matrix[individual[-1], 0]  # Return to warehouse
 
-    # Calculate time and costs
-    time_hours = total_distance / average_speed_kmh
-    total_gas_cost = total_distance * gas_cost_per_km
-    total_driver_cost = time_hours * driver_cost_per_hour
-    total_auxiliary_cost = time_hours * auxiliary_cost_per_hour
-    total_cost = total_gas_cost + total_driver_cost + total_auxiliary_cost
-
-    return total_cost,  # Return total cost as fitness value
+    if optimize_for == "distance":
+        # Optimize for total distance
+        return total_distance,
+    elif optimize_for == "cost":
+        # Optimize for total cost
+        time_hours = total_distance / average_speed_kmh
+        total_gas_cost = total_distance * gas_cost_per_km
+        total_driver_cost = time_hours * driver_cost_per_hour
+        total_auxiliary_cost = time_hours * auxiliary_cost_per_hour
+        total_cost = total_gas_cost + total_driver_cost + total_auxiliary_cost
+        return total_cost,
 
 
 toolbox.register("evaluate", eval_route)
@@ -82,6 +94,10 @@ best_route = genetic_algorithm_route()
 decoded_route = ['Warehouse'] + [list(delivery_points.keys())[i] for i in best_route] + ['Warehouse']
 print("Optimal Route:", " -> ".join(decoded_route))
 
-# Evaluate and calculate the cost of the optimal route
-optimal_cost = eval_route(best_route)[0]
-print(f"Total Cost: ${optimal_cost:.2f}")
+# Evaluate and display the chosen optimization (distance or cost)
+if optimize_for == "distance":
+    optimal_distance = eval_route(best_route)[0]
+    print(f"Total Distance: {optimal_distance:.2f} km")
+else:
+    optimal_cost = eval_route(best_route)[0]
+    print(f"Total Cost: ${optimal_cost:.2f}")
