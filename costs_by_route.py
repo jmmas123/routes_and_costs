@@ -125,6 +125,71 @@ routes = [
         "gas_cost_per_km": 0.30,
         "average_speed_kmh": 60,
     },
+    {
+        "name": "Lourdes, Sonsonate",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Lourdes": (13.722546962095567, -89.36819169097939),
+            "Sonsonate": (13.717906246822801, -89.72425805578887),
+        },
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
+    {
+        "name": "Apopa, San Luis",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Apopa": (13.79996666691705, -89.17740146468317),
+            "San Luis": (13.71587512531585, -89.21281628594396),
+        },
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
+    {
+        "name": "Mercado, Mejicanos",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Mercado": (13.70035372408547, -89.19660503156757),
+            "Mejicanos": (13.722615588871603, -89.18888120921),
+        },
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
+    {
+        "name": "Cojute, Iloabasco",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Cojute": (13.722794399195264, -88.93393263231938),
+            "Ilobasco": (13.842682983328299, -88.85068395980095),
+        },
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
+    {
+        "name": "Aguilares, Chalatenango",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Aguilares": (13.957413890800401, -89.18619658970312),
+            "Chalatenango": (14.042284566312114, -88.93687057229887),
+        },
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
 
 ]
 
