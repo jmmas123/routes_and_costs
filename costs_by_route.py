@@ -59,6 +59,20 @@ routes = [
         "average_speed_kmh": 60,
     },
     {
+        "name": "Soyapango, Venecia, San Martin",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Soyapango": (13.702721412595531, -89.1488075058194),
+            "Venecia": (13.715569379866428, -89.14405464527051),
+            "San Martin": (13.73715057948368, -89.055748653535),
+        },
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
+    {
         "name": "Quezaltepeque, Metro Sur, Salvador del mundo",
         "points": {
             "PLISA": (13.814771381058584, -89.40960526517033),
