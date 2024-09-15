@@ -1,5 +1,6 @@
 import googlemaps
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+import folium
 
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
@@ -237,51 +238,90 @@ def calculate_route_cost(route, total_distance):
     total_cost = gas_cost + driver_cost + aux_personnel_cost
     return total_cost
 
-
-# Process each route and calculate costs
+# Function to process each route and calculate costs
 for route in routes:
     print(f"Processing {route['name']}")
 
-    # Step 1: Create distance and time matrices for the route using Google Maps API
+    # Create distance and time matrices for the route using Google Maps API
     distance_matrix, time_matrix = create_googlemaps_distance_matrix(route)
 
-    # Step 2: Set up OR-Tools routing model
+    # Set up OR-Tools routing model
     n_locations = len(route["points"])
-    manager = pywrapcp.RoutingIndexManager(n_locations, 1, 0)  # 1 vehicle, starting at node 0 (Warehouse)
+    manager = pywrapcp.RoutingIndexManager(n_locations, 1, 0)  # 1 vehicle, starting at node 0 (PLISA)
     routing = pywrapcp.RoutingModel(manager)
+
 
     # Create and register a transit callback to get distances
     def distance_callback(from_index, to_index):
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return int(distance_matrix[from_node][to_node] * 1000)  # OR-Tools works in meters, so we multiply by 1000
+        return int(distance_matrix[from_node][to_node] * 1000)  # Convert km to meters for OR-Tools
+
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
-    # Solve the problem
+    # Solve the problem with the cheapest path strategy
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
     solution = routing.SolveWithParameters(search_parameters)
-
-    # Step 3: Extract the solution and calculate the total distance and time
-    total_distance = 0
     total_travel_time = 0  # Initialize variable for travel time
+
+    # Extract the solution and calculate the total distance and time
     if solution:
         index = routing.Start(0)
+        plan_output = f"Route for {route['name']}:\n"
+        route_distance = 0
         while not routing.IsEnd(index):
             next_index = solution.Value(routing.NextVar(index))
-            # Add the distance and time between current and next index
-            total_distance += distance_matrix[manager.IndexToNode(index)][manager.IndexToNode(next_index)]
+            plan_output += f"{manager.IndexToNode(index)} -> "
+            route_distance += distance_matrix[manager.IndexToNode(index)][manager.IndexToNode(next_index)]
             total_travel_time += time_matrix[manager.IndexToNode(index)][manager.IndexToNode(next_index)]
+
             index = next_index
 
-    # Print the total distance
-    print(f"Total Distance for {route['name']}: {total_distance:.2f} km")
+        # Ensure to print the return to the starting point explicitly
+        plan_output += f"{manager.IndexToNode(routing.Start(0))}\n"  # Shows return to start
+        plan_output += f"Total Distance: {route_distance:.2f} km\n"
+        plan_output += f"Total Travel Time: {total_travel_time:.2f} hours\n"
 
-    # Print the total travel time in hours
-    print(f"Total Travel Time for {route['name']}: {total_travel_time:.2f} hours")
+        # Calculate total cost based on the distance
+        total_cost = calculate_route_cost(route, route_distance)
+        plan_output += f"Total Cost: ${total_cost:.2f}\n"
+        print(plan_output)
 
-    # Step 4: Calculate total cost for the route based on the distance
-    total_cost = calculate_route_cost(route, total_distance)
-    print(f"Total Cost for {route['name']}: ${total_cost:.2f}\n")
+
+# Function to initialize the map
+def init_map(center_location, zoom_start=8):
+    return folium.Map(location=center_location, zoom_start=zoom_start)
+
+
+# Function to add routes to the map
+def add_route_to_map(m, route, line_color):
+    route_points = list(route["points"].values())
+
+    # Add markers for each point in the route
+    for point_name, point in route["points"].items():
+        folium.Marker(
+            location=point,
+            popup=f"<strong>{point_name}</strong>",
+            icon=folium.Icon(color="blue", icon="info-sign")
+        ).add_to(m)
+
+    # Add lines to connect the points
+    folium.PolyLine(route_points, color=line_color, weight=5, opacity=0.8).add_to(m)
+
+
+# Colors for different routes
+colors = ['blue', 'green', 'red', 'purple', 'orange', 'darkblue', 'lightblue', 'beige', 'darkgreen', 'cadetblue']
+
+# Initialize the map centered around the first point of the first route
+map_obj = init_map(center_location=list(routes[0]["points"].values())[0])
+
+# Add each route to the map with a different color
+for idx, route in enumerate(routes):
+    add_route_to_map(map_obj, route, colors[
+        idx % len(colors)])  # Use modulo to cycle through colors if there are more routes than colors
+
+# Save the map as an HTML file
+map_obj.save('routes_costs_analyzed.html')
