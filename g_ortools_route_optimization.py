@@ -46,9 +46,12 @@ delivery_points = {
 # Exclude PLISA from clustering but include in routes
 cluster_points = {key: val for key, val in delivery_points.items() if key != 'PLISA'}
 coords = np.array(list(cluster_points.values()))
-number_of_vehicles = 3  # Number of vehicles/routes available
+number_of_vehicles = 15  # Number of vehicles/routes available
 
-# Perform K-Means clustering with the number of clusters equal to the number of vehicles
+# Set maximum stores per vehicle
+max_stores_per_vehicle = 3
+
+# Perform K-Means clustering
 kmeans = KMeans(n_clusters=number_of_vehicles, random_state=0).fit(coords)
 labels = kmeans.labels_
 
@@ -60,6 +63,15 @@ for label, point_key in zip(labels, cluster_points.keys()):
 # Add PLISA as the start of each route
 for cluster in clustered_points.values():
     cluster.insert(0, 'PLISA')
+
+# Check if any cluster exceeds the store limit
+exceeds_limit = False
+for idx, cluster in clustered_points.items():
+    if len(cluster) > max_stores_per_vehicle:
+        exceeds_limit = True
+
+if exceeds_limit:
+    print(f"With the current number of vehicles/routes, it's not possible to visit all delivery points respecting the store limit of {max_stores_per_vehicle} per route.")
 
 # Function to create a distance matrix and time matrix for a list of points
 def create_distance_and_time_matrix(points):
@@ -89,11 +101,18 @@ def draw_route(route, color):
         folium.Marker(delivery_points[point], icon=folium.Icon(color=color), popup=point).add_to(m)
 
 # Colors for different routes
-colors = ['red', 'blue', 'green', 'black', 'yellow']
+colors = ['gray', 'darkpurple', 'lightgray', 'darkgreen', 'black', 'orange', 'red', 'lightred', 'cadetblue',
+          'lightgreen', 'darkgray', 'darkred', 'green', 'lightblue', 'blue', 'darkblue', 'beige', 'pink', 'purple']
 
 # Process each cluster
 for idx, points in clustered_points.items():
-    if len(points) > 1:
+    if len(points) > 1:  # Only process clusters with delivery points
+        # Check if the number of points exceeds the max stores per vehicle limit
+        if len(points) - 1 > max_stores_per_vehicle:  # Exclude PLISA
+            print(f"Cluster {idx + 1} has more than {max_stores_per_vehicle} stores. Skipping this route:")
+            print(f"Cluster {idx + 1} points: {points}\n")
+            continue
+
         distance_matrix, time_matrix = create_distance_and_time_matrix(points)
         manager = pywrapcp.RoutingIndexManager(len(distance_matrix), 1, 0)
         routing = pywrapcp.RoutingModel(manager)
@@ -128,8 +147,10 @@ for idx, points in clustered_points.items():
             print(f'Route for Cluster {idx + 1}:')
             print(' -> '.join(route))
             print(f'Total Distance: {total_distance_km:.2f} km')
-            print(f'Total Travel Time: {total_time_hrs:.2f} hours')
+            print(f'Total Travel Time: {total_time_hrs:.2f} hours\n')
             draw_route(route, colors[idx % len(colors)])
+        else:
+            print(f"No feasible route found for Cluster {idx + 1}.")
 
 # Save the map to an HTML file
 m.save('routes_map_google_or_maps.html')

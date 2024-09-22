@@ -8,12 +8,13 @@ gmaps = googlemaps.Client(key='***REMOVED***')
 # Define multiple routes (each with 2 or more delivery points)
 routes = [
     {
-        "name": "C1,C2",
+        "name": "C1, C2",
         "points": {
             "PLISA": (13.814771381058584, -89.40960526517033),
             "C1": (13.700274849301179, -89.19658727198426),
             "C2": (13.699592083787923, -89.18796916668566),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -27,6 +28,7 @@ routes = [
             "Zacatecoluca": (13.508156875451148, -88.87071996613791),
             "Usulutan": (13.343501570460036, -88.43294264877568),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -40,6 +42,7 @@ routes = [
             "San Miguel": (13.482360485812624, -88.17610609308709),
             "San Miguel EE": (13.463518936844718, -88.16620547920196),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -53,6 +56,7 @@ routes = [
             "San Vicente": (13.643651339058886, -88.78490442744153),
             "Gotera": (13.697070523244175, -88.10436389687582),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -67,6 +71,7 @@ routes = [
             "Venecia": (13.715569379866428, -89.14405464527051),
             "San Martin": (13.73715057948368, -89.055748653535),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -81,6 +86,7 @@ routes = [
             "Metro Sur": (13.704360322759676, -89.21402777415823),
             "Salvador del mundo": (13.701135550084564, -89.22052841523039),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -94,6 +100,7 @@ routes = [
             "Santa Tecla": (13.67294569959625, -89.28502017015064),
             "Cascadas": (13.678180325512601, -89.25021950575061),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -107,6 +114,7 @@ routes = [
             "Chalchuapa": (13.985296777730383, -89.6775984964213),
             "Ahuachapan": (13.924841153067355, -89.84505308415532),
         },
+        'unloading_time_h_per_store': 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -120,6 +128,7 @@ routes = [
             "Metapan": (14.33101137444799, -89.44344776909121),
             "Santa Ana": (13.993745561931757, -89.5575659095613),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -133,6 +142,7 @@ routes = [
             "Lourdes": (13.722546962095567, -89.36819169097939),
             "Sonsonate": (13.717906246822801, -89.72425805578887),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -146,6 +156,7 @@ routes = [
             "Apopa": (13.79996666691705, -89.17740146468317),
             "San Luis": (13.71587512531585, -89.21281628594396),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -159,6 +170,7 @@ routes = [
             "Mercado": (13.70035372408547, -89.19660503156757),
             "Mejicanos": (13.722615588871603, -89.18888120921),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -172,6 +184,7 @@ routes = [
             "Cojute": (13.722794399195264, -88.93393263231938),
             "Ilobasco": (13.842682983328299, -88.85068395980095),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -185,6 +198,7 @@ routes = [
             "Aguilares": (13.957413890800401, -89.18619658970312),
             "Chalatenango": (14.042284566312114, -88.93687057229887),
         },
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 2.0,
         "num_aux_personnel": 2,
@@ -193,6 +207,12 @@ routes = [
     },
 
 ]
+
+def calculate_unique_stores(route):
+    # Extract delivery points (stores) and count unique ones
+    unique_stores = set(route["points"].keys())
+    num_stores = len(unique_stores)
+    return num_stores
 
 # Function to calculate road distance using Google Maps API
 def create_googlemaps_distance_matrix(route):
@@ -224,23 +244,34 @@ def create_googlemaps_distance_matrix(route):
 
     return distance_matrix, time_matrix
 
+# Updated function to calculate route cost, now using travel time directly
+def calculate_route_cost(route, total_distance, total_travel_time):
+    # Calculate the unique number of stores (delivery points)
+    num_stores = calculate_unique_stores(route)
 
-# Function to calculate the total cost for a route
-def calculate_route_cost(route, total_distance):
-    time_hours = total_distance / route["average_speed_kmh"]
+    # Calculate unloading time cost for the stores
+    unloading_time_total = route['unloading_time_h_per_store'] * (num_stores-1)
+
+    # Total time including unloading (use Google Maps travel time)
+    total_time = total_travel_time + unloading_time_total
 
     # Calculate individual costs
     gas_cost = total_distance * route["gas_cost_per_km"]
-    driver_cost = time_hours * route["driver_wage_per_hour"]
-    aux_personnel_cost = time_hours * route["aux_personnel_wage_per_hour"] * route["num_aux_personnel"]
+    driver_cost = total_time * route["driver_wage_per_hour"]
+    aux_personnel_cost = total_time * route["aux_personnel_wage_per_hour"] * route["num_aux_personnel"]
 
     # Total cost for the route
     total_cost = gas_cost + driver_cost + aux_personnel_cost
+
+    print(f"Total unloading time: {unloading_time_total} hours")
+    print(f"Total travel time: {total_travel_time:.2f} hours")
+    print(f"Total time: {total_time:.2f} hours")
+
     return total_cost
 
 # Function to process each route and calculate costs
 for route in routes:
-    print(f"Processing {route['name']}")
+    print(f"Processing {route['name']}\n")
 
     # Create distance and time matrices for the route using Google Maps API
     distance_matrix, time_matrix = create_googlemaps_distance_matrix(route)
@@ -250,13 +281,11 @@ for route in routes:
     manager = pywrapcp.RoutingIndexManager(n_locations, 1, 0)  # 1 vehicle, starting at node 0 (PLISA)
     routing = pywrapcp.RoutingModel(manager)
 
-
     # Create and register a transit callback to get distances
     def distance_callback(from_index, to_index):
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
         return int(distance_matrix[from_node][to_node] * 1000)  # Convert km to meters for OR-Tools
-
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
@@ -270,7 +299,7 @@ for route in routes:
     # Extract the solution and calculate the total distance and time
     if solution:
         index = routing.Start(0)
-        plan_output = f"Route for {route['name']}:\n"
+        plan_output = f"Specified route order:\n"
         route_distance = 0
         while not routing.IsEnd(index):
             next_index = solution.Value(routing.NextVar(index))
@@ -283,13 +312,12 @@ for route in routes:
         # Ensure to print the return to the starting point explicitly
         plan_output += f"{manager.IndexToNode(routing.Start(0))}\n"  # Shows return to start
         plan_output += f"Total Distance: {route_distance:.2f} km\n"
-        plan_output += f"Total Travel Time: {total_travel_time:.2f} hours\n"
 
-        # Calculate total cost based on the distance
-        total_cost = calculate_route_cost(route, route_distance)
+        # Calculate total cost based on the distance and actual travel time
+        total_cost = calculate_route_cost(route, route_distance, total_travel_time)
         plan_output += f"Total Cost: ${total_cost:.2f}\n"
+        plan_output += f"Suggested Price: ${total_cost * 1.5:.2f}\n"
         print(plan_output)
-
 
 # Function to initialize the map
 def init_map(center_location, zoom_start=8):
