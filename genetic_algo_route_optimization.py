@@ -46,7 +46,7 @@ delivery_points = {
 
 # Prepare data for clustering
 coords = np.array(list(delivery_points.values()))
-n_vehicles = 3  # Number of vehicles/clusters
+n_vehicles = 5  # Number of vehicles/clusters
 
 # Perform K-Means clustering
 kmeans = KMeans(n_clusters=n_vehicles, random_state=0).fit(coords)
