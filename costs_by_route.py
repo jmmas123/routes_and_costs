@@ -341,7 +341,8 @@ def add_route_to_map(m, route, line_color):
 
 
 # Colors for different routes
-colors = ['blue', 'green', 'red', 'purple', 'orange', 'darkblue', 'lightblue', 'beige', 'darkgreen', 'cadetblue']
+colors = ['black', 'darkpurple', 'blue', 'green', 'lightred', 'gray', 'cadetblue', 'white', 'darkgreen', 'lightblue',
+          'purple', 'pink', 'beige', 'orange', 'red', 'lightgreen', 'darkred', 'lightgray', 'darkblue']
 
 # Initialize the map centered around the first point of the first route
 map_obj = init_map(center_location=list(routes[0]["points"].values())[0])
