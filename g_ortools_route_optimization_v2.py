@@ -43,11 +43,6 @@ delivery_points = {
     # Add other locations as needed
 }
 
-from sklearn.cluster import KMeans
-import numpy as np
-import folium
-from ortools.constraint_solver import pywrapcp, routing_enums_pb2
-
 number_of_vehicles = 1
 # Number of vehicles/routes available
 max_stores_per_vehicle = 3  # Maximum number of stores per vehicle
