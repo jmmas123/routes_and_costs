@@ -48,7 +48,7 @@ import numpy as np
 import folium
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
-number_of_vehicles = 5
+number_of_vehicles = 1
 # Number of vehicles/routes available
 max_stores_per_vehicle = 3  # Maximum number of stores per vehicle
 
@@ -170,8 +170,11 @@ def draw_route(route, color):
         folium.Marker(delivery_points[point], icon=folium.Icon(color=color), popup=point).add_to(m)
 
 # Colors for different routes
-colors = ['black', 'darkpurple', 'blue', 'green', 'lightred', 'gray', 'cadetblue', 'white', 'darkgreen', 'lightblue',
-          'purple', 'pink', 'beige', 'orange', 'red', 'lightgreen', 'darkred', 'lightgray', 'darkblue']
+colors = ['black', 'darkpurple', 'blue', 'green', 'lightred', 'gray', 'cadetblue', 'darkgreen', 'lightblue',
+          'purple', 'pink', 'orange', 'red', 'lightgreen', 'darkred', 'lightgray', 'darkblue']
+
+# Initialize a variable to store total distance for all routes
+total_km_all_routes = 0
 
 # Process each final cluster for routing
 for idx, points in final_clusters.items():
@@ -214,9 +217,62 @@ for idx, points in final_clusters.items():
             print(' -> '.join(route))
             print(f'Total Distance: {total_distance_km:.2f} km')
             print(f'Total Travel Time: {total_time_hrs:.2f} hours\n')
+
+            # Add the total distance of this route to the overall total
+            total_km_all_routes += total_distance_km
+
+            # Draw the route on the map
             draw_route(route, colors[idx % len(colors)])
         else:
             print(f"No feasible route found for Cluster {idx + 1}.")
+
+# Print the total kilometers for all routes
+print(f'Total Distance for all routes: {total_km_all_routes:.2f} km')
+
+# # Process each final cluster for routing
+# for idx, points in final_clusters.items():
+#     if len(points) > 1:  # Only process clusters with delivery points
+#         distance_matrix, time_matrix = create_distance_and_time_matrix(points)
+#         manager = pywrapcp.RoutingIndexManager(len(distance_matrix), 1, 0)
+#         routing = pywrapcp.RoutingModel(manager)
+#
+#
+#         # Distance callback
+#         def distance_callback(from_index, to_index):
+#             from_node = manager.IndexToNode(from_index)
+#             to_node = manager.IndexToNode(to_index)
+#             return distance_matrix[from_node][to_node]
+#
+#
+#         transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+#         routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+#
+#         # Search parameters
+#         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+#         search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+#
+#         # Solve the problem
+#         solution = routing.SolveWithParameters(search_parameters)
+#         if solution:
+#             index = routing.Start(0)
+#             route = []
+#             total_distance_km = 0
+#             total_time_hrs = 0
+#             while not routing.IsEnd(index):
+#                 next_index = solution.Value(routing.NextVar(index))
+#                 route.append(points[manager.IndexToNode(index)])
+#                 total_distance_km += distance_matrix[manager.IndexToNode(index)][
+#                                          manager.IndexToNode(next_index)] / 1000  # Meters to km
+#                 total_time_hrs += time_matrix[manager.IndexToNode(index)][manager.IndexToNode(next_index)]
+#                 index = next_index
+#             route.append('PLISA')  # Append PLISA to close the loop if round trip is needed
+#             print(f'Route for Cluster {idx + 1}:')
+#             print(' -> '.join(route))
+#             print(f'Total Distance: {total_distance_km:.2f} km')
+#             print(f'Total Travel Time: {total_time_hrs:.2f} hours\n')
+#             draw_route(route, colors[idx % len(colors)])
+#         else:
+#             print(f"No feasible route found for Cluster {idx + 1}.")
 
 # Save the map to an HTML file
 m.save('routes_map_google_or_maps_v2.html')
