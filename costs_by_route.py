@@ -205,6 +205,34 @@ routes = [
         "gas_cost_per_km": 0.30,
         "average_speed_kmh": 60,
     },
+    {
+        "name": "San Luis, Laico",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Aguilares": (13.71587512531585, -89.21281628594396),
+            "Chalatenango": (13.712915, -89.199730),
+        },
+        "unloading_time_h_per_store": 1.0,
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
+{
+        "name": "Alsasa",
+        "points": {
+            "PLISA": (13.814771381058584, -89.40960526517033),
+            "Alsasa": (13.736415681105896, -89.40258351847194),
+
+        },
+        "unloading_time_h_per_store": 1.0,
+        "driver_wage_per_hour": 2.5,
+        "aux_personnel_wage_per_hour": 2.0,
+        "num_aux_personnel": 2,
+        "gas_cost_per_km": 0.30,
+        "average_speed_kmh": 60,
+    },
 
 ]
 
