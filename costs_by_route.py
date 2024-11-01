@@ -242,7 +242,7 @@ routes = [
         },
         "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
-        "aux_personnel_wage_per_hour": 3.0,
+        "aux_personnel_wage_per_hour": 2.8,
         "num_aux_personnel": 3,
         "gas_cost_per_km": 0.35,
         "average_speed_kmh": 60,
