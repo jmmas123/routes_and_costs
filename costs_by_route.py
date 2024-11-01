@@ -234,21 +234,17 @@ routes = [
         "average_speed_kmh": 60,
     },
 {
-        "name": "ejemplo",
+        "name": "Flete guate",
         "points": {
             "PLISA": (13.814771381058584, -89.40960526517033),
-            "C1": (13.700274849301179, -89.19658727198426),
-            "C2": (13.699592083787923, -89.18796916668566),
-            "p1": (13.726657667659977, -89.22063759090057),
-            "p2": (13.702896185614616, -89.19859200624545),
-            "p3": (13.696275833204176, -89.19804612158993),
+            "G1": (14.573568892732993, -90.54842361137793),
 
         },
-        "unloading_time_h_per_store": 0.3,
+        "unloading_time_h_per_store": 2.0,
         "driver_wage_per_hour": 2.5,
         "aux_personnel_wage_per_hour": 3.0,
         "num_aux_personnel": 3,
-        "gas_cost_per_km": 0.30,
+        "gas_cost_per_km": 0.35,
         "average_speed_kmh": 60,
     },
 
@@ -363,7 +359,7 @@ for route in routes:
         # Calculate total cost based on the distance and actual travel time
         total_cost = calculate_route_cost(route, route_distance, total_travel_time)
         plan_output += f"Total Cost: ${total_cost:.2f}\n"
-        plan_output += f"Suggested Price: ${total_cost * 1.5:.2f}\n"
+        plan_output += f"Suggested Price: ${total_cost * 2.0:.2f}\n"
         print(plan_output)
 
 # Function to initialize the map

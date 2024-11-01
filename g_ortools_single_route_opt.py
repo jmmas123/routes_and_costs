@@ -12,10 +12,7 @@ gmaps = googlemaps.Client(key='***REMOVED***')
 # Dictionary of all unique locations
 delivery_points = {
     "PLISA": (13.814771381058584, -89.40960526517033),
-    "C1": (13.700274849301179, -89.19658727198426),
-    "C2": (13.699592083787923, -89.18796916668566),
-    "Salvador del mundo": (13.701135550084564, -89.22052841523039),
-    # Add other locations as needed
+    "C1": (14.573568892732993, -90.54842361137793),
 }
 
 number_of_vehicles = 1
