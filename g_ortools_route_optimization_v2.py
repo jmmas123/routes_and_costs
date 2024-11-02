@@ -45,7 +45,7 @@ delivery_points = {
     # Add other locations as needed
 }
 
-number_of_vehicles = 1
+number_of_vehicles = 13
 # Number of vehicles/routes available
 max_stores_per_vehicle = 3  # Maximum number of stores per vehicle
 

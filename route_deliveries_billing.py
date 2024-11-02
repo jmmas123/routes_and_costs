@@ -24,8 +24,8 @@ def load_data():
             if file_type == 'overtime':
                 return (r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - '
                         r'OPL/Horas extra')
-            if file_type == 'overtime_t':
-                return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Horas extra'
+            if file_type == 'routing':
+                return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
             elif file_type == 'workforce':
                 return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
 
@@ -44,7 +44,7 @@ def load_data():
     # Read document containing salaries and workforce
     df_salary = pd.read_excel(workforce_and_salaries_path, sheet_name='Hora regular', header=0)
     # Read document containing Routing information
-    df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y fletes')
+    df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
     # Read document containing Route delivery points
     df_rutas = pd.read_excel(income_overtime_client_path, sheet_name='Rutas')
     # Read document containing Truck information
@@ -61,24 +61,60 @@ def load_data():
 
     return df_delivery_overtime, df_salary, df_control, df_rutas, df_camiones, df_precios
 
-def process_control_df(control_df, df_salary, df_camiones):
+
+def get_fuel_price_on_date(precios_df, date):
+    # Convert date columns to datetime if not already
+    precios_df['Fecha'] = pd.to_datetime(precios_df['Fecha'])
+    date = pd.to_datetime(date)
+
+    # Filter prices up to the given date
+    precios_before_date = precios_df[precios_df['Fecha'] <= date]
+
+    if precios_before_date.empty:
+        return None  # No prices available before the date
+
+    # Get the latest available date before or equal to the route date
+    latest_date = precios_before_date['Fecha'].max()
+
+    # Filter for the latest date and 'Central' zone
+    latest_prices = precios_before_date[
+        (precios_before_date['Fecha'] == latest_date) & (precios_before_date['Zona'] == 'Central')]
+
+    if latest_prices.empty:
+        return None  # No prices available for 'Central' zone on that date
+
+    diesel_price_per_gallon = latest_prices['Diesel'].iloc[0]
+
+    return diesel_price_per_gallon
+
+def process_control_df(control_df, df_salary, df_camiones, precios_df):
     routes = []
 
-    # Identify rows where 'Ruta' is NaN (after conversion, these will be 'nan' strings)
-    nan_route_mask = control_df['Ruta'] == 'nan'
+    # Create a copy of the DataFrame to avoid modifying the original
+    df = control_df.copy()
 
-    # Assign unique route identifiers to NaN 'Ruta' rows
-    control_df.loc[nan_route_mask, 'Ruta'] = 'Special Delivery' + control_df[nan_route_mask].index.astype(str)
+    # Create a 'Ruta' column by converting 'Ruta (si fue agregado a una ruta)' to string
+    df['Ruta'] = df['Ruta (si fue agregado a una ruta)'].astype(str)
 
-    # Ensure that 'Ruta' is treated as a string
-    control_df['Ruta'] = control_df['Ruta (si fue agregado a una ruta)'].astype(str)
+    # Ensure 'Fecha' is in datetime format
+    df['Fecha'] = pd.to_datetime(df['Fecha'])
 
-    # Group by 'Ruta'
-    grouped = control_df.groupby('Ruta')
+    # Create a unique route identifier by combining 'Ruta' and 'Fecha'
+    # For routes without a number ('nan'), create a unique identifier using the date and index
+    def generate_route_id(row):
+        if row['Ruta'] == 'nan' or pd.isna(row['Ruta']):
+            return f"No_Ruta_{row['Fecha'].date()}_{row.name}"
+        else:
+            return f"Ruta_{row['Ruta']}_{row['Fecha'].date()}"
 
-    for route_number, group in grouped:
+    df['Route_ID'] = df.apply(generate_route_id, axis=1)
+
+    # Now group by 'Route_ID'
+    grouped = df.groupby('Route_ID')
+
+    for route_id, group in grouped:
         # For each group (route), create a route dict
-        route_name = f"Ruta {route_number}"
+        route_name = f"{route_id}"
         points = {
             "PLISA": (13.814771381058584, -89.40960526517033)
         }
@@ -128,23 +164,36 @@ def process_control_df(control_df, df_salary, df_camiones):
 
             if placa_vehiculo is None:
                 driver_cargo = 'MOTORISTA'
+                efficiency_km_per_gallon = None  # No truck specified
             else:
-                # Match the placa with Camiones df to get capacity
+                # Match the placa with Camiones df to get capacity and efficiency
                 camion_info = df_camiones[df_camiones['Placa'] == placa_vehiculo]
                 if not camion_info.empty:
                     capacidad_ton = camion_info['Capacidad (Ton)'].iloc[0]
+                    efficiency_km_per_gallon = camion_info['Eficiencia (km/gal)'].iloc[0]
                     if capacidad_ton > 10:
                         driver_cargo = 'MOTORISTA LICENCIA PESADA'
                     else:
                         driver_cargo = 'MOTORISTA'
                 else:
-                    print(f"No truck information found for placa '{placa_vehiculo}'. Defaulting to 'MOTORISTA'.")
-                    driver_cargo = 'MOTORISTA'
+                    print(f"Error: No truck information found for placa '{placa_vehiculo}'.")
+                    # You can choose to raise an error or assign default values
+                    # For this example, we'll raise an exception
+                    raise ValueError(f"No truck information found for placa '{placa_vehiculo}' in Camiones df.")
 
             # Get driver wage per hour from Salaries df
+            print(f"Looking up salary for driver cargo: '{driver_cargo}'")
             driver_salary_info = df_salary[df_salary['Cargo'] == driver_cargo]
+            print(f"Driver salary info:\n{driver_salary_info}")
+
             if not driver_salary_info.empty:
-                driver_wage_per_hour = driver_salary_info['Salario/Hora'].iloc[0]
+                try:
+                    driver_wage_per_hour = float(driver_salary_info['Salario/Hora'].iloc[0])
+                    print(f"Driver wage per hour: {driver_wage_per_hour}")
+                except (IndexError, KeyError, ValueError) as e:
+                    print(f"Error retrieving 'Salario/Hora' for cargo '{driver_cargo}': {e}")
+                    print(f"Using default driver wage per hour: 2.5")
+                    driver_wage_per_hour = 2.5  # Default value
             else:
                 print(f"No salary information found for cargo '{driver_cargo}'. Using default value 2.5.")
                 driver_wage_per_hour = 2.5  # Default value
@@ -166,6 +215,24 @@ def process_control_df(control_df, df_salary, df_camiones):
         # Assign average speed
         average_speed_kmh = 60  # Default value
 
+        # Get the date of the route
+        route_date = group['Fecha'].iloc[0]
+
+        # Find the fuel price for the date and zone
+        fuel_price_per_gallon = get_fuel_price_on_date(precios_df, route_date)
+
+        if fuel_price_per_gallon is None:
+            print(f"No fuel price found for date {route_date}. Using default value $4.00 per gallon.")
+            fuel_price_per_gallon = 4.00  # Default value
+
+            # Calculate gas cost per km
+            if efficiency_km_per_gallon is not None:
+                gas_cost_per_km = fuel_price_per_gallon / efficiency_km_per_gallon
+            else:
+                print(
+                    f"Efficiency per gallon is not available for route '{route_name}'. Cannot calculate gas cost per km.")
+                gas_cost_per_km = None  # Or assign a default value if appropriate
+
         route = {
             "name": route_name,
             "points": points,
@@ -174,7 +241,8 @@ def process_control_df(control_df, df_salary, df_camiones):
             "aux_personnel_wage_per_hour": aux_personnel_wage_per_hour,
             "num_aux_personnel": int(num_aux_personnel),
             "average_speed_kmh": average_speed_kmh,
-            # 'gas_cost_per_km' will be computed later
+            "gas_cost_per_km": gas_cost_per_km,
+            # Add other fields as needed
         }
 
         routes.append(route)
@@ -193,11 +261,8 @@ def main():
 
     df_delivery_overtime, df_salary, df_control, df_rutas, df_camiones, df_precios = load_data()
 
-    pd.set_option(
-        "display.max_rows", None,
-        "display.max_columns", None,
-        "display.expand_frame_repr", False
-    )
+    # Process Control df to create routes
+    routes = process_control_df(df_control, df_camiones, df_salary, df_precios)
 
     # # Save the results to a CSV file
     # output_path = os.path.join(get_base_output_path(), 'warehouse_proportional_operations.csv')
