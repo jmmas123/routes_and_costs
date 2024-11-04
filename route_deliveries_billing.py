@@ -22,6 +22,7 @@ def load_data():
                 return r'\\192.168.10.18\Bodega General\HE\VARIOS\Horas'
             elif file_type == 'routing':
                 return r'\\192.168.10.18\Bodega General\HE\VARIOS\rutas'
+                # return r'C:\JM\GM\MOBU - OPL\Rutas'
             elif file_type == 'workforce':
                 return r'C:\JM\GM\MOBU - OPL\Planilla'
         else:  # MacOS
@@ -185,21 +186,17 @@ def process_control_df(df_control, df_salary, df_camiones, df_precios):
                 # For this example, we'll raise an exception
                 raise ValueError(f"No truck information found for placa '{placa_vehiculo}' in Camiones df.")
 
-        # Get driver wage per hour from Salaries df
-        print(f"Looking up salary for driver cargo: '{driver_cargo}'")
         driver_salary_info = df_salary[df_salary['Cargo'] == driver_cargo]
-        print(f"Driver salary info:\n{driver_salary_info}")
 
         if not driver_salary_info.empty:
             try:
                 driver_wage_per_hour = float(driver_salary_info['Salario/Hora'].iloc[0])
-                print(f"Driver wage per hour: {driver_wage_per_hour}")
             except (IndexError, KeyError, ValueError) as e:
                 print(f"Error retrieving 'Salario/Hora' for cargo '{driver_cargo}': {e}")
                 print(f"Using default driver wage per hour: 2.5")
                 driver_wage_per_hour = 2.5  # Default value
         else:
-            print(f"No salary information found for cargo '{driver_cargo}'. Using default value 2.5.")
+            print(f"No salary information found for cargo '{driver_cargo}'. Using default value $2.5.")
             driver_wage_per_hour = 2.5  # Default value
 
         # Determine auxiliary personnel wage per hour
@@ -208,7 +205,7 @@ def process_control_df(df_control, df_salary, df_camiones, df_precios):
         if not aux_salary_info.empty:
             aux_personnel_wage_per_hour = aux_salary_info['Salario/Hora'].iloc[0]
         else:
-            print(f"No salary information found for cargo '{aux_cargo}'. Using default value 2.0.")
+            print(f"No salary information found for cargo '{aux_cargo}'. Using default value $2.0.")
             aux_personnel_wage_per_hour = 2.0  # Default value
 
         # Get the number of auxiliary personnel (take max value or default)
@@ -281,7 +278,7 @@ def calculate_distances_and_times(routes_df):
         # Count delivery points
         delivery_points_count.append(len(points))
 
-        # Convert points to sorted list of coordinates
+        # Convert points to a sorted list of coordinates
         sorted_points = sorted(points.items())
         waypoints_str = [f"{lat},{lon}" for name, (lat, lon) in sorted_points]
 
@@ -304,6 +301,20 @@ def calculate_distances_and_times(routes_df):
                 print(f"Error retrieving distance/duration for {origin} to {destination}: {e}")
                 continue
 
+        # Add the return leg to make it a round trip
+        if waypoints_str:
+            origin = waypoints_str[-1]
+            destination = waypoints_str[0]  # return to the starting point
+            try:
+                result = gmaps.distance_matrix(origins=[origin], destinations=[destination], mode="driving")
+                return_distance = result["rows"][0]["elements"][0]["distance"]["value"]  # meters
+                return_duration = result["rows"][0]["elements"][0]["duration"]["value"]  # seconds
+
+                total_distance += return_distance / 1000  # convert meters to km
+                total_duration += return_duration / 3600  # convert seconds to hours
+            except Exception as e:
+                print(f"Error retrieving distance/duration for return trip {origin} to {destination}: {e}")
+
         total_distances.append(total_distance)
         eta_hours_list.append(total_duration)
 
@@ -313,6 +324,7 @@ def calculate_distances_and_times(routes_df):
     routes_df["total_delivery_points"] = delivery_points_count
 
     return routes_df
+
 
 def clean_dataframe(routes_df):
     # Drop latitude and longitude columns
