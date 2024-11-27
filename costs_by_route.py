@@ -8,12 +8,14 @@ from datetime import time
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
 
+
 def get_base_output_path():
     if os.name == 'nt':  # Windows
         obase_path = r'C:\Users\josemaria\Downloads'
     else:  # MacOS (or others)
         obase_path = r'/Users/j.m./Downloads'
     return obase_path
+
 
 def load_data():
     # Define the paths to your data files
@@ -46,11 +48,13 @@ def load_data():
     income_overtime_client_path = os.path.join(overtime_t_base_path, 'control de rutas y fletes.xlsx')
 
     # Read the second table from the second sheet
-    df_delivery_overtime = pd.read_excel(overtime_file_path, sheet_name='Horas en ruta', header=0, dtype={'Codigo': str})
+    df_delivery_overtime = pd.read_excel(overtime_file_path, sheet_name='Horas en ruta', header=0,
+                                         dtype={'Codigo': str})
     # Read document containing salaries and workforce
     df_salary = pd.read_excel(workforce_and_salaries_path, sheet_name='Hora regular', header=0)
     # Read document containing Routing information
     df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
+    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='ISSS')
     # Read document containing Route delivery points
     df_rutas = pd.read_excel(income_overtime_client_path, sheet_name='Rutas')
     # Read document containing Truck information
@@ -124,9 +128,187 @@ def get_fuel_price_on_date(precios_df, date):
     if latest_prices.empty:
         return None  # No prices available for 'Central' zone on that date
 
-    diesel_price_per_gallon = latest_prices['Diesel'].iloc[0]
+    diesel_price_per_gallon = latest_prices['Superior'].iloc[0]
 
     return diesel_price_per_gallon
+
+
+# def process_control_df(df_control, df_salary, df_camiones, df_precios):
+#     routes = []
+#
+#     # Create a copy of the DataFrame to avoid modifying the original
+#     df = df_control.copy()
+#
+#     # Create a 'Ruta' column by converting 'Ruta (si fue agregado a una ruta)' to string
+#     df['Ruta'] = df['Ruta (si fue agregado a una ruta)'].astype(str)
+#
+#     # Ensure 'Fecha' is in datetime format
+#     df['Fecha'] = pd.to_datetime(df['Fecha'])
+#
+#     # Create a unique route identifier by combining 'Ruta' and 'Fecha'
+#     # For routes without a number ('nan'), create a unique identifier using the date and index
+#     def generate_route_id(row):
+#         if row['Ruta'] == 'nan' or pd.isna(row['Ruta']):
+#             return f"Ruta Especial - {row['Fecha'].date()}"
+#         else:
+#             return f"Ruta {row['Ruta']} - {row['Fecha'].date()}"
+#
+#     df['Route_ID'] = df.apply(generate_route_id, axis=1)
+#
+#     # Now group by 'Route_ID'
+#     grouped = df.groupby('Route_ID')
+#
+#     for route_id, group in grouped:
+#         # For each group (route), create a route dict
+#         route_name = f"{route_id}"
+#         empresa_name = group['Empresa'].iloc[0] if 'Empresa' in group.columns else "Unknown Empresa"
+#         points = {
+#             "PLISA": (13.814771381058584, -89.40960526517033)
+#         }
+#
+#         # For each delivery point in the route, extract the 'Direccion' and 'Coordenada'
+#         for idx, row in group.iterrows():
+#             direccion = row['Direccion']
+#             coordenada = row['Coordenada']
+#             if isinstance(coordenada, str):
+#                 try:
+#                     lat_str, lon_str = coordenada.strip().split(',')
+#                     lat = float(lat_str)
+#                     lon = float(lon_str)
+#                     points[direccion] = (lat, lon)
+#                 except Exception as e:
+#                     print(f"Error parsing coordenada '{coordenada}' at index {idx}: {e}")
+#             else:
+#                 print(f"Invalid coordenada at index {idx}: {coordenada}")
+#
+#         # Calculate unloading time per store from 'Hora Inicio' and 'Hora Fin'
+#         unloading_times = []
+#         for idx, row in group.iterrows():
+#             hora_inicio = row['Hora Inicio']
+#             hora_fin = row['Hora Fin']
+#             if pd.notna(hora_inicio) and pd.notna(hora_fin):
+#                 try:
+#                     time_format = '%H:%M:%S'
+#                     t_inicio = pd.to_datetime(hora_inicio, format=time_format)
+#                     t_fin = pd.to_datetime(hora_fin, format=time_format)
+#                     unloading_time = (t_fin - t_inicio).total_seconds() / 3600  # in hours
+#                     unloading_times.append(unloading_time)
+#                 except Exception as e:
+#                     print(f"Error parsing times at index {idx}: {e}")
+#             else:
+#                 # If times are missing, assume default unloading time
+#                 unloading_times.append(1.0)  # Default unloading time per store
+#
+#         # Calculate average unloading time per store
+#         if unloading_times:
+#             # Calculate total unloading time for the route
+#             unloading_time_h_per_store = sum(unloading_times) if unloading_times else len(group)  # Defaults to 1h/store
+#         else:
+#             unloading_time_h_per_store = 1.0  # Default value
+#
+#         # Determine driver wage per hour
+#         placas = group['Placa Vehiculo'].unique()
+#         placa_vehiculo = placas[0] if pd.notna(placas[0]) else None
+#
+#         if placa_vehiculo is None:
+#             driver_cargo = 'MOTORISTA'
+#             efficiency_km_per_gallon = None  # No truck specified
+#         else:
+#             # Match the placa with Camiones df to get capacity and efficiency
+#             camion_info = df_camiones[df_camiones['Placa'] == placa_vehiculo]
+#             if not camion_info.empty:
+#                 capacidad_ton = camion_info['Capacidad (Ton)'].iloc[0]
+#                 efficiency_km_per_gallon = camion_info['Eficiencia (km/gal)'].iloc[0]
+#                 if capacidad_ton > 10:
+#                     driver_cargo = 'MOTORISTA LICENCIA PESADA'
+#                 else:
+#                     driver_cargo = 'MOTORISTA'
+#             else:
+#                 print(f"Error: No truck information found for placa '{placa_vehiculo}'.")
+#                 # You can choose to raise an error or assign default values
+#                 # For this example, we'll raise an exception
+#                 raise ValueError(f"No truck information found for placa '{placa_vehiculo}' in Camiones df.")
+#
+#         driver_salary_info = df_salary[df_salary['Cargo'] == driver_cargo]
+#
+#         if not driver_salary_info.empty:
+#             try:
+#                 driver_wage_per_hour = float(driver_salary_info['Salario/Hora'].iloc[0])
+#             except (IndexError, KeyError, ValueError) as e:
+#                 print(f"Error retrieving 'Salario/Hora' for cargo '{driver_cargo}': {e}")
+#                 print(f"Using default driver wage per hour: 2.5")
+#                 driver_wage_per_hour = 2.5  # Default value
+#         else:
+#             print(f"No salary information found for cargo '{driver_cargo}'. Using default value $2.5.")
+#             driver_wage_per_hour = 2.5  # Default value
+#
+#         # Determine auxiliary personnel wage per hour
+#         aux_cargo = 'DESPACHADOR'  # Assuming 'DESPACHADOR' as the role for auxiliary personnel
+#         aux_salary_info = df_salary[df_salary['Cargo'] == aux_cargo]
+#         if not aux_salary_info.empty:
+#             aux_personnel_wage_per_hour = aux_salary_info['Salario/Hora'].iloc[0]
+#         else:
+#             print(f"No salary information found for cargo '{aux_cargo}'. Using default value $2.0.")
+#             aux_personnel_wage_per_hour = 2.0  # Default value
+#
+#         # Get the number of auxiliary personnel (take max value or default)
+#         num_aux_personnel = group['Num Auxiliares'].max()
+#         if pd.isna(num_aux_personnel):
+#             num_aux_personnel = 2  # Default value
+#
+#         # Get the date of the route
+#         route_date = group['Fecha'].iloc[0]
+#
+#         # Find the fuel price for the date and zone
+#         fuel_price_per_gallon = get_fuel_price_on_date(df_precios, route_date)
+#
+#         if fuel_price_per_gallon is None:
+#             print(f"No fuel price found for date {route_date}. Using default value $4.00 per gallon.")
+#             fuel_price_per_gallon = 4.00  # Default value
+#
+#         # Calculate gas cost per km
+#         if efficiency_km_per_gallon is not None:
+#             gas_cost_per_km = fuel_price_per_gallon / efficiency_km_per_gallon
+#         else:
+#             print(
+#                 f"Efficiency per gallon is not available for route '{route_name}'. Cannot calculate gas cost per km.")
+#             gas_cost_per_km = 0.30  # default value
+#
+#         route = {
+#             "name": route_name,
+#             "Empresa": empresa_name,
+#             "points": points,
+#             "unloading_time_h_per_store": unloading_time_h_per_store,
+#             "driver_wage_per_hour": driver_wage_per_hour,
+#             "aux_personnel_wage_per_hour": aux_personnel_wage_per_hour,
+#             "num_aux_personnel": int(num_aux_personnel),
+#             "gas_cost_per_km": gas_cost_per_km
+#         }
+#
+#         routes.append(route)
+#
+#     # Flatten each route's points dictionary into individual entries for easier DataFrame creation
+#     routes_flattened = []
+#     for route in routes:
+#         flattened_route = {k: v for k, v in route.items() if k != 'points'}  # keep all keys except 'points'
+#         for point_name, coords in route['points'].items():
+#             flattened_route[f"{point_name}_lat"] = coords[0]
+#             flattened_route[f"{point_name}_lon"] = coords[1]
+#         routes_flattened.append(flattened_route)
+#
+#     # Convert to DataFrame and return
+#     routes_df = pd.DataFrame(routes_flattened)
+#
+#     print("Route data:\n", routes_df)
+#
+#     return routes_df
+#
+
+def assign_special_route(df_control):
+    # Assign "Ruta Especial" to rows with no specific route
+    df_control['Ruta (si fue agregado a una ruta)'] = (df_control['Ruta (si fue agregado a una ruta)'].fillna
+                                                      ("Especial"))
+    return df_control
 
 def process_control_df(df_control, df_salary, df_camiones, df_precios):
     routes = []
@@ -134,242 +316,221 @@ def process_control_df(df_control, df_salary, df_camiones, df_precios):
     # Create a copy of the DataFrame to avoid modifying the original
     df = df_control.copy()
 
-    # Create a 'Ruta' column by converting 'Ruta (si fue agregado a una ruta)' to string
-    df['Ruta'] = df['Ruta (si fue agregado a una ruta)'].astype(str)
-
     # Ensure 'Fecha' is in datetime format
     df['Fecha'] = pd.to_datetime(df['Fecha'])
 
-    # Create a unique route identifier by combining 'Ruta' and 'Fecha'
-    # For routes without a number ('nan'), create a unique identifier using the date and index
-    def generate_route_id(row):
-        if row['Ruta'] == 'nan' or pd.isna(row['Ruta']):
-            return f"Ruta Especial - {row['Fecha'].date()}"
-        else:
-            return f"Ruta {row['Ruta']} - {row['Fecha'].date()}"
+    # Group by 'Ruta' and 'Fecha'
+    grouped = df.groupby(['Ruta (si fue agregado a una ruta)', 'Fecha'])
 
-    df['Route_ID'] = df.apply(generate_route_id, axis=1)
+    for (route_id, date), group in grouped:
+        # Skip rows without a valid route identifier
+        if pd.isna(route_id):
+            continue
 
-    # Now group by 'Route_ID'
-    grouped = df.groupby('Route_ID')
+        # Identify all distinct clients on this route
+        clients = group['Empresa'].unique()
 
-    for route_id, group in grouped:
-        # For each group (route), create a route dict
-        route_name = f"{route_id}"
-        empresa_name = group['Empresa'].iloc[0] if 'Empresa' in group.columns else "Unknown Empresa"
-        points = {
-            "PLISA": (13.814771381058584, -89.40960526517033)
-        }
+        # Total delivery points in the route
+        total_delivery_points = len(group)
 
-        # For each delivery point in the route, extract the 'Direccion' and 'Coordenada'
-        for idx, row in group.iterrows():
-            direccion = row['Direccion']
-            coordenada = row['Coordenada']
-            if isinstance(coordenada, str):
-                try:
-                    lat_str, lon_str = coordenada.strip().split(',')
-                    lat = float(lat_str)
-                    lon = float(lon_str)
-                    points[direccion] = (lat, lon)
-                except Exception as e:
-                    print(f"Error parsing coordenada '{coordenada}' at index {idx}: {e}")
-            else:
-                print(f"Invalid coordenada at index {idx}: {coordenada}")
+        for client in clients:
+            # Filter the group for the specific client
+            client_group = group[group['Empresa'] == client]
 
-        # Calculate unloading time per store from 'Hora Inicio' and 'Hora Fin'
-        unloading_times = []
-        for idx, row in group.iterrows():
-            hora_inicio = row['Hora Inicio']
-            hora_fin = row['Hora Fin']
-            if pd.notna(hora_inicio) and pd.notna(hora_fin):
-                try:
-                    time_format = '%H:%M:%S'
-                    t_inicio = pd.to_datetime(hora_inicio, format=time_format)
-                    t_fin = pd.to_datetime(hora_fin, format=time_format)
-                    unloading_time = (t_fin - t_inicio).total_seconds() / 3600  # in hours
-                    unloading_times.append(unloading_time)
-                except Exception as e:
-                    print(f"Error parsing times at index {idx}: {e}")
-            else:
-                # If times are missing, assume default unloading time
-                unloading_times.append(1.0)  # Default unloading time per store
+            # Client-specific delivery points
+            client_delivery_points = len(client_group)
 
-        # Calculate average unloading time per store
-        if unloading_times:
-            # Calculate total unloading time for the route
-            unloading_time_h_per_store = sum(unloading_times) if unloading_times else len(group)  # Defaults to 1h/store
-        else:
-            unloading_time_h_per_store = 1.0  # Default value
+            # Calculate client proportion
+            client_proportion = client_delivery_points / total_delivery_points if total_delivery_points > 0 else 0
 
-        # Determine driver wage per hour
-        placas = group['Placa Vehiculo'].unique()
-        placa_vehiculo = placas[0] if pd.notna(placas[0]) else None
+            # Extract route details
+            empresa_name = client
+            points = {
+                "PLISA": (13.814771381058584, -89.40960526517033)  # Add the starting point if needed
+            }
 
-        if placa_vehiculo is None:
-            driver_cargo = 'MOTORISTA'
-            efficiency_km_per_gallon = None  # No truck specified
-        else:
-            # Match the placa with Camiones df to get capacity and efficiency
-            camion_info = df_camiones[df_camiones['Placa'] == placa_vehiculo]
-            if not camion_info.empty:
-                capacidad_ton = camion_info['Capacidad (Ton)'].iloc[0]
-                efficiency_km_per_gallon = camion_info['Eficiencia (km/gal)'].iloc[0]
-                if capacidad_ton > 10:
-                    driver_cargo = 'MOTORISTA LICENCIA PESADA'
+            # Add each client's delivery points
+            for idx, row in client_group.iterrows():
+                direccion = row['Direccion']
+                coordenada = row['Coordenada']
+                if isinstance(coordenada, str):
+                    try:
+                        lat_str, lon_str = coordenada.strip().split(',')
+                        lat = float(lat_str)
+                        lon = float(lon_str)
+                        points[direccion] = (lat, lon)
+                    except Exception as e:
+                        print(f"Error parsing coordenada '{coordenada}' at index {idx}: {e}")
                 else:
-                    driver_cargo = 'MOTORISTA'
-            else:
-                print(f"Error: No truck information found for placa '{placa_vehiculo}'.")
-                # You can choose to raise an error or assign default values
-                # For this example, we'll raise an exception
-                raise ValueError(f"No truck information found for placa '{placa_vehiculo}' in Camiones df.")
+                    print(f"Invalid coordenada at index {idx}: {coordenada}")
 
-        driver_salary_info = df_salary[df_salary['Cargo'] == driver_cargo]
+            # Calculate unloading time per store for the client
+            unloading_times = []
+            for idx, row in client_group.iterrows():
+                hora_inicio = row['Hora Inicio']
+                hora_fin = row['Hora Fin']
+                if pd.notna(hora_inicio) and pd.notna(hora_fin):
+                    try:
+                        time_format = '%I:%M %p'  # Handle AM/PM format
+                        t_inicio = pd.to_datetime(hora_inicio, format=time_format)
+                        t_fin = pd.to_datetime(hora_fin, format=time_format)
+                        unloading_time = (t_fin - t_inicio).total_seconds() / 3600  # in hours
+                        unloading_times.append(unloading_time)
+                    except Exception as e:
+                        print(f"Error parsing times at index {idx}: {e}")
+                else:
+                    # Default unloading time per store
+                    unloading_times.append(1.0)
 
-        if not driver_salary_info.empty:
-            try:
-                driver_wage_per_hour = float(driver_salary_info['Salario/Hora'].iloc[0])
-            except (IndexError, KeyError, ValueError) as e:
-                print(f"Error retrieving 'Salario/Hora' for cargo '{driver_cargo}': {e}")
-                print(f"Using default driver wage per hour: 2.5")
-                driver_wage_per_hour = 2.5  # Default value
-        else:
-            print(f"No salary information found for cargo '{driver_cargo}'. Using default value $2.5.")
-            driver_wage_per_hour = 2.5  # Default value
+            # Calculate total unloading time for the client
+            unloading_time_h_per_store = sum(unloading_times) if unloading_times else len(client_group)
 
-        # Determine auxiliary personnel wage per hour
-        aux_cargo = 'DESPACHADOR'  # Assuming 'DESPACHADOR' as the role for auxiliary personnel
-        aux_salary_info = df_salary[df_salary['Cargo'] == aux_cargo]
-        if not aux_salary_info.empty:
-            aux_personnel_wage_per_hour = aux_salary_info['Salario/Hora'].iloc[0]
-        else:
-            print(f"No salary information found for cargo '{aux_cargo}'. Using default value $2.0.")
-            aux_personnel_wage_per_hour = 2.0  # Default value
+            # Fetch driver and auxiliary personnel details
+            placa_vehiculo = group['Placa Vehiculo'].iloc[0] if not group['Placa Vehiculo'].isna().all() else None
+            driver_cargo = 'MOTORISTA'
+            efficiency_km_per_gallon = 0.3  # Default value
 
-        # Get the number of auxiliary personnel (take max value or default)
-        num_aux_personnel = group['Num Auxiliares'].max()
-        if pd.isna(num_aux_personnel):
-            num_aux_personnel = 2  # Default value
+            if placa_vehiculo:
+                camion_info = df_camiones[df_camiones['Placa'] == placa_vehiculo]
+                if not camion_info.empty:
+                    efficiency_km_per_gallon = camion_info['Eficiencia (km/gal)'].iloc[0]
 
-        # Get the date of the route
-        route_date = group['Fecha'].iloc[0]
+            driver_salary_info = df_salary[df_salary['Cargo'] == driver_cargo]
+            driver_wage_per_hour = driver_salary_info['Salario/Hora'].iloc[0] if not driver_salary_info.empty else 2.5
 
-        # Find the fuel price for the date and zone
-        fuel_price_per_gallon = get_fuel_price_on_date(df_precios, route_date)
+            aux_cargo = 'DESPACHADOR'
+            aux_salary_info = df_salary[df_salary['Cargo'] == aux_cargo]
+            aux_personnel_wage_per_hour = aux_salary_info['Salario/Hora'].iloc[0] if not aux_salary_info.empty else 2.0
+            num_aux_personnel = group['Num Auxiliares'].max() if not group['Num Auxiliares'].isna().all() else 2
 
-        if fuel_price_per_gallon is None:
-            print(f"No fuel price found for date {route_date}. Using default value $4.00 per gallon.")
-            fuel_price_per_gallon = 4.00  # Default value
+            # Fuel price calculation
+            fuel_price_per_gallon = get_fuel_price_on_date(df_precios, date)
+            if fuel_price_per_gallon is None:
+                fuel_price_per_gallon = 4.0  # Default value
 
-        # Calculate gas cost per km
-        if efficiency_km_per_gallon is not None:
-            gas_cost_per_km = fuel_price_per_gallon / efficiency_km_per_gallon
-        else:
-            print(
-                f"Efficiency per gallon is not available for route '{route_name}'. Cannot calculate gas cost per km.")
-            gas_cost_per_km = 0.30  # default value
+            gas_cost_per_km = fuel_price_per_gallon / efficiency_km_per_gallon if efficiency_km_per_gallon else 0.3
 
-        route = {
-            "name": route_name,
-            "Empresa": empresa_name,
-            "points": points,
-            "unloading_time_h_per_store": unloading_time_h_per_store,
-            "driver_wage_per_hour": driver_wage_per_hour,
-            "aux_personnel_wage_per_hour": aux_personnel_wage_per_hour,
-            "num_aux_personnel": int(num_aux_personnel),
-            "gas_cost_per_km": gas_cost_per_km
-        }
+            # Create the route record
+            route = {
+                "name": f"Ruta {route_id} - {date.date()}",
+                "Empresa": empresa_name,
+                "unloading_time_h_per_store": unloading_time_h_per_store * client_proportion,
+                "driver_wage_per_hour": driver_wage_per_hour,
+                "aux_personnel_wage_per_hour": aux_personnel_wage_per_hour,
+                "num_aux_personnel": num_aux_personnel,
+                "gas_cost_per_km": gas_cost_per_km,
+                "client_proportion": client_proportion,
+                **{f"{point}_lat": lat for point, (lat, lon) in points.items()},
+                **{f"{point}_lon": lon for point, (lat, lon) in points.items()}
+            }
 
-        routes.append(route)
+            routes.append(route)
 
-    # Flatten each route's points dictionary into individual entries for easier DataFrame creation
-    routes_flattened = []
-    for route in routes:
-        flattened_route = {k: v for k, v in route.items() if k != 'points'}  # keep all keys except 'points'
-        for point_name, coords in route['points'].items():
-            flattened_route[f"{point_name}_lat"] = coords[0]
-            flattened_route[f"{point_name}_lon"] = coords[1]
-        routes_flattened.append(flattened_route)
+    # Convert routes to a DataFrame
+    routes_df = pd.DataFrame(routes)
 
-    # Convert to DataFrame and return
-    routes_df = pd.DataFrame(routes_flattened)
+    # Verify that proportions for each route sum to 1
+    route_sums = routes_df.groupby('name')['client_proportion'].sum()
+    if not all(np.isclose(route_sums, 1.0)):
+        print("Warning: Proportions do not sum to 1 for all routes!")
+        print(route_sums[~np.isclose(route_sums, 1.0)])
 
-    print("Route data:\n", routes_df)
+    print("Updated Route data:\n", routes_df)
 
     return routes_df
 
-
 def calculate_distances_and_times(routes_df):
+    """
+    Calculate total distances and travel times for routes, including round trips.
+    """
     # Initialize lists for distance, duration, and delivery points
     total_distances = []
     eta_hours_list = []
     delivery_points_count = []
 
     for _, row in routes_df.iterrows():
-        # Extract points from the DataFrame row
-        points = {col.replace("_lat", "").replace("_lon", ""): (row[f"{col}"], row[f"{col.replace('_lat', '_lon')}"])
-                  for col in row.index if "_lat" in col}
+        # Extract latitude and longitude pairs
+        points = {
+            col.replace("_lat", ""): (row[f"{col}"], row[f"{col.replace('_lat', '_lon')}"])
+            for col in routes_df.columns if "_lat" in col and f"{col.replace('_lat', '_lon')}" in routes_df.columns
+        }
 
-        # Clean out NaN values from points
+        # Remove invalid points where either latitude or longitude is NaN
         points = {name: coords for name, coords in points.items() if not pd.isna(coords[0]) and not pd.isna(coords[1])}
 
-        # Count delivery points
+        # Count valid delivery points
         delivery_points_count.append(len(points))
 
-        # Convert points to a sorted list of coordinates
-        sorted_points = sorted(points.items())
-        waypoints_str = [f"{lat},{lon}" for name, (lat, lon) in sorted_points]
+        # Skip if there are less than two valid points (cannot calculate distances)
+        if len(points) < 2:
+            total_distances.append(0)
+            eta_hours_list.append(0)
+            continue
+
+        # Prepare waypoints as a list of coordinates
+        waypoints = list(points.values())
+        waypoints_str = [f"{lat},{lon}" for lat, lon in waypoints]
 
         total_distance = 0
         total_duration = 0
 
-        # Calculate distance and ETA for each consecutive pair of points
-        for i in range(len(waypoints_str) - 1):
-            origin = waypoints_str[i]
-            destination = waypoints_str[i + 1]
-            try:
-                # Google Maps API request for distance and duration
+        # Calculate distance and ETA for consecutive points
+        try:
+            for i in range(len(waypoints_str) - 1):
+                origin = waypoints_str[i]
+                destination = waypoints_str[i + 1]
+
+                # Request distance and duration from Google Maps API
                 result = gmaps.distance_matrix(origins=[origin], destinations=[destination], mode="driving")
-                distance = result["rows"][0]["elements"][0]["distance"]["value"]  # meters
-                duration = result["rows"][0]["elements"][0]["duration"]["value"]  # seconds
+                element = result["rows"][0]["elements"][0]
 
-                total_distance += distance / 1000  # convert meters to km
-                total_duration += duration / 3600  # convert seconds to hours
-            except Exception as e:
-                print(f"Error retrieving distance/duration for {origin} to {destination}: {e}")
-                continue
+                # Check if the response has valid distance and duration
+                if "distance" in element and "duration" in element:
+                    distance = element["distance"]["value"]  # meters
+                    duration = element["duration"]["value"]  # seconds
 
-        # Add the return leg to make it a round trip
-        if waypoints_str:
+                    total_distance += distance / 1000  # Convert meters to kilometers
+                    total_duration += duration / 3600  # Convert seconds to hours
+
+            # Add the return leg to make it a round trip
             origin = waypoints_str[-1]
-            destination = waypoints_str[0]  # return to the starting point
-            try:
-                result = gmaps.distance_matrix(origins=[origin], destinations=[destination], mode="driving")
-                return_distance = result["rows"][0]["elements"][0]["distance"]["value"]  # meters
-                return_duration = result["rows"][0]["elements"][0]["duration"]["value"]  # seconds
+            destination = waypoints_str[0]
+            result = gmaps.distance_matrix(origins=[origin], destinations=[destination], mode="driving")
+            element = result["rows"][0]["elements"][0]
 
-                total_distance += return_distance / 1000  # convert meters to km
-                total_duration += return_duration / 3600  # convert seconds to hours
-            except Exception as e:
-                print(f"Error retrieving distance/duration for return trip {origin} to {destination}: {e}")
+            if "distance" in element and "duration" in element:
+                return_distance = element["distance"]["value"]  # meters
+                return_duration = element["duration"]["value"]  # seconds
 
+                total_distance += return_distance / 1000  # Convert meters to kilometers
+                total_duration += return_duration / 3600  # Convert seconds to hours
+
+        except Exception as e:
+            print(f"Error calculating distance or duration: {e}")
+            total_distance = 0
+            total_duration = 0
+
+        # Append results for the current route
         total_distances.append(total_distance)
         eta_hours_list.append(total_duration)
 
-    # Add total distance, ETA, and delivery points count columns to DataFrame
+    # Add results as new columns in the DataFrame
     routes_df["total_km"] = total_distances
     routes_df["eta_hours"] = eta_hours_list
     routes_df["total_delivery_points"] = delivery_points_count
+
+
+    print("Route data:\n", routes_df)
 
     return routes_df
 
 
 def clean_dataframe(routes_df):
-    # Drop latitude and longitude columns
+    # Drop latitude and longitude columns to simplify the data
     lat_lon_cols = [col for col in routes_df.columns if "_lat" in col or "_lon" in col]
     routes_df = routes_df.drop(columns=lat_lon_cols)
 
-    # Rename columns as specified
+    # Rename columns for clarity
     routes_df = routes_df.rename(columns={
         'unloading_time_h_per_store': 'Unloading time (Total)',
         'eta_hours': 'Driving time (Total)',
@@ -379,32 +540,25 @@ def clean_dataframe(routes_df):
         'aux_personnel_wage_per_hour': 'Aux personnel wage',
         'num_aux_personnel': 'Number of aux personnel',
         'gas_cost_per_km': 'Gas cost/km',
+        'client_proportion': 'Client Proportion'
     })
 
-    # Reorder columns as per specified structure (excluding 'date' for now)
+    # Reorder columns to align with expected output structure
     routes_df = routes_df[[
-        'name',
-        'Unloading time (Total)',
-        'Driving time (Total)',
-        'Total delivery points',
-        'Total Km traveled',
-        'Driver wage',
-        'Aux personnel wage',
-        'Number of aux personnel',
-        'Gas cost/km',
+        'name', 'Empresa', 'Unloading time (Total)', 'Driving time (Total)', 'Total delivery points',
+        'Total Km traveled', 'Driver wage', 'Aux personnel wage', 'Number of aux personnel',
+        'Gas cost/km', 'Client Proportion'
     ]]
 
-    # Function to separate name and date into two columns
+    # Split the 'name' column into separate 'Name' and 'Date' columns
     def split_name_and_date(value):
-        # Check for standard route pattern
         match = re.match(r'Ruta (\d+)\.\d+ - (\d{4}-\d{2}-\d{2})', value)
         if match:
-            route_number = f"Ruta {match.group(1)}"  # Route name without decimal
+            route_number = f"Ruta {match.group(1)}"
             date_str = match.group(2)
             formatted_date = pd.to_datetime(date_str).strftime('%d/%m/%Y')
             return route_number, formatted_date
 
-        # Check for special route pattern
         special_match = re.match(r'Ruta Especial - (\d{4}-\d{2}-\d{2})', value)
         if special_match:
             route_number = "Ruta Especial"
@@ -412,59 +566,176 @@ def clean_dataframe(routes_df):
             formatted_date = pd.to_datetime(date_str).strftime('%d/%m/%Y')
             return route_number, formatted_date
 
-        # Return original name and NaN if no match
         return value, pd.NaT
 
-    # Apply the function to split 'name' into 'name' and 'date'
     routes_df[['Name', 'Date']] = routes_df['name'].apply(lambda x: pd.Series(split_name_and_date(x)))
 
-    # Reorder columns to include the new 'date' column
+    # Reorder columns to include the new 'Name' and 'Date' columns
     routes_df = routes_df[[
-        'Date',
-        'Name',
-        'Unloading time (Total)',
-        'Driving time (Total)',
-        'Total delivery points',
-        'Total Km traveled',
-        'Driver wage',
-        'Aux personnel wage',
-        'Number of aux personnel',
-        'Gas cost/km',
+        'Date', 'Name', 'Empresa', 'Unloading time (Total)', 'Driving time (Total)',
+        'Total delivery points', 'Total Km traveled', 'Driver wage', 'Aux personnel wage',
+        'Number of aux personnel', 'Gas cost/km', 'Client Proportion'
     ]]
 
-    print("Routing info:\n", routes_df)
+    print("Cleaned Routing Info:\n", routes_df)
 
     return routes_df
 
+def write_to_excel_with_individual_formatting(output_file,
+                                              df_routing_costs,
+                                              df_client_summary,
+                                              df_general_totals):
+    """
+    Writes multiple DataFrames to an Excel file with custom formatting for individual sheets.
+
+    Args:
+        output_file (str): Path to the output Excel file.
+        df_routing_costs (DataFrame): DataFrame containing detailed routing costs.
+        df_client_summary (DataFrame): DataFrame summarizing costs by client.
+        df_general_totals (DataFrame): DataFrame containing overall totals.
+    """
+    # Define sheet names and corresponding DataFrames
+    sheet_mapping = {
+        'Routing Costs': df_routing_costs,
+        'Client Summary': df_client_summary,
+        'General Totals': df_general_totals
+    }
+
+    # Create the ExcelWriter object
+    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+        workbook = writer.book
+
+        # Define formatting styles
+        header_format = workbook.add_format({'bold': True, 'bg_color': '#D3D3D3', 'border': 1})
+        date_format = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+        regular_number_format = workbook.add_format({'num_format': '#,##0.00'})
+        accounting_format = workbook.add_format({'num_format': '$#,##0.00'})
+
+        # Write each DataFrame to its own sheet with formatting
+        for sheet_name, dataframe in sheet_mapping.items():
+            # Write the DataFrame
+            dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+            worksheet = writer.sheets[sheet_name]
+
+            # Apply header formatting and adjust column widths
+            for col_num, header in enumerate(dataframe.columns):
+                worksheet.write(0, col_num, header, header_format)
+                col_width = max(len(header) + 2, dataframe[header].astype(str).map(len).max() + 2)
+                worksheet.set_column(col_num, col_num, col_width)
+
+            # Apply custom formatting based on the sheet
+            if sheet_name == 'Routing Costs':
+                # Format the 'Date' column if it exists
+                if 'Date' in dataframe.columns:
+                    date_col_idx = dataframe.columns.get_loc('Date')
+                    worksheet.set_column(date_col_idx, date_col_idx, 12, date_format)
+
+                # Format monetary columns
+                for col_name in ['Total gas cost', 'Total wage cost', 'Total route cost']:
+                    if col_name in dataframe.columns:
+                        col_idx = dataframe.columns.get_loc(col_name)
+                        worksheet.set_column(col_idx, col_idx, 15, accounting_format)
+
+            elif sheet_name == 'Client Summary':
+                # Format numeric columns
+                for col_name in ['Total delivery points', 'Total Km traveled']:
+                    if col_name in dataframe.columns:
+                        col_idx = dataframe.columns.get_loc(col_name)
+                        worksheet.set_column(col_idx, col_idx, 10, regular_number_format)
+
+                # Format monetary columns
+                for col_name in ['Total gas cost', 'Total wage cost', 'Total route cost']:
+                    if col_name in dataframe.columns:
+                        col_idx = dataframe.columns.get_loc(col_name)
+                        worksheet.set_column(col_idx, col_idx, 15, accounting_format)
+
+            elif sheet_name == 'General Totals':
+                # Format monetary columns
+                for col_name in ['Total gas cost', 'Total wage cost', 'Total route cost']:
+                    if col_name in dataframe.columns:
+                        col_idx = dataframe.columns.get_loc(col_name)
+                        worksheet.set_column(col_idx, col_idx, 15, accounting_format)
+
+    print(f"\nDataFrames have been successfully written to {output_file}\n")
+
+
+
 
 def general_cost_calculation(routes_df):
-    # Calculate total gas cost based on total km and gas cost per km
+    # Ensure the date column is properly extracted
+    if 'Date' not in routes_df.columns:
+        routes_df['Date'] = routes_df['Name'].str.extract(r'- (\d{4}-\d{2}-\d{2})')[0]
+
+    # Assign "Ruta Especial" to rows without a route
+    routes_df['Name'] = routes_df['Name'].fillna("Ruta Especial")
+
+    # Calculate total gas cost per route
     routes_df['Total gas cost'] = routes_df['Total Km traveled'] * routes_df['Gas cost/km']
 
     # Calculate total wage cost
-    # First, calculate the combined hourly wage for driver and auxiliary personnel
     routes_df['Total wage cost'] = (
-            (routes_df['Driver wage'] + (routes_df['Aux personnel wage'] * routes_df['Number of aux personnel'])) *
-            (routes_df['Unloading time (Total)'] + routes_df['Driving time (Total)'])
+        (routes_df['Driver wage'] + (routes_df['Aux personnel wage'] * routes_df['Number of aux personnel'])) *
+        (routes_df['Unloading time (Total)'] + routes_df['Driving time (Total)'])
     )
 
-    # Calculate the total cost as sum of gas cost and wage cost
+    # Calculate total cost of the route
     routes_df['Total route cost'] = routes_df['Total gas cost'] + routes_df['Total wage cost']
 
-    # Select relevant columns to display
+    # Select columns to display the cost breakdown
     cost_columns = [
-        'Name', 'Date', 'Total Km traveled', 'Gas cost/km', 'Total gas cost',
-        'Unloading time (Total)', 'Driving time (Total)', 'Driver wage',
-        'Aux personnel wage', 'Number of aux personnel', 'Total wage cost', 'Total route cost'
+        'Date', 'Name', 'Empresa', 'Total delivery points', 'Total Km traveled', 'Total gas cost',
+        'Unloading time (Total)', 'Driving time (Total)', 'Number of aux personnel',
+        'Total wage cost', 'Total route cost'
     ]
     cost_df = routes_df[cost_columns]
 
-    print("Cost calculation:\n", cost_df)
+    print("Cost Breakdown:\n", cost_df)
 
     return cost_df
 
 
 
+def write_to_excel_with_individual_formatting(output_file, cost_df):
+    # Define sheet names and corresponding DataFrames
+    sheet_mapping = {
+        'Cotizacion de ruteo': cost_df,
+    }
+    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+        workbook = writer.book
+        header_format = workbook.add_format({'bold': True, 'bg_color': '#D3D3D3', 'border': 1})
+
+        # Define simplified custom formats compatible with xlsxwriter
+        date_format = workbook.add_format({'num_format': 'yyyy-mm-dd'})  # Simple date format
+        regular_number_format = workbook.add_format({'num_format': '#,##0.00'})  # Number format with two decimals
+        accounting_format = workbook.add_format(
+            {'num_format': '$#,##0.00'})  # Simple accounting format with two decimals
+
+        # Write each DataFrame to its sheet and format individually
+        for sheet_name, dataframe in sheet_mapping.items():
+            # Write the DataFrame to the sheet
+            dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+            worksheet = writer.sheets[sheet_name]
+
+            # Apply header formatting for each column header
+            for col_num, header in enumerate(dataframe.columns):
+                worksheet.write(0, col_num, header, header_format)
+
+                # Set the column width to fit the header length with a bit of padding
+                header_length = len(header) + 2
+                worksheet.set_column(col_num, col_num, header_length)
+
+            # Apply specific formatting for "Horas en bodega" sheet (Sheet 1)
+            if sheet_name == 'Cotizacion de ruteo':
+                # Column 1 (Date) formatting
+                worksheet.set_column(0, 0, 20)  # Delivery points
+                worksheet.set_column(1, 1, 20, regular_number_format)  # Total Delivery points
+                worksheet.set_column(2, 2, 18, regular_number_format)   # Total KM traveled
+                worksheet.set_column(3, 3, 18, accounting_format)   # Total gas cost
+                worksheet.set_column(4, 4, 20, regular_number_format)   # Total unloading time
+                worksheet.set_column(5, 5, 18, regular_number_format)   # Total driving time
+                worksheet.set_column(6, 6, 22, regular_number_format)   # Number of aux personel
+                worksheet.set_column(7, 7, 18, accounting_format)   # Total wage cost
+                worksheet.set_column(8, 8, 18, accounting_format)   # Total route cost
 
 
 def main():
@@ -481,6 +752,8 @@ def main():
     df_control = clean_time_format(df_control, 'Hora Inicio')
     df_control = clean_time_format(df_control, 'Hora Fin')
 
+    df_control = assign_special_route(df_control)
+
     # Process Control df to create routes
     routes_df = process_control_df(df_control, df_salary, df_camiones, df_precios)
 
@@ -490,15 +763,11 @@ def main():
 
     routing_cost = general_cost_calculation(routes_calc_df)
 
-    # # Save the results to a CSV file
-    # output_path = os.path.join(get_base_output_path(), 'warehouse_proportional_operations.csv')
-    # df_warehouse_proportional.to_csv(output_path, index=False)
-    # print(f"\nResults saved to {output_path}")
-    #
-    # output_path = os.path.join(get_base_output_path(), 'warehouse_grouped_client.csv')
-    # grouped_warehouse.to_csv(output_path, index=False)
-    # print(f"\nResults saved to {output_path}")
+    # Define the output path and file name
+    output_file = os.path.join(get_base_output_path(), 'Costos de ruteo.xlsx')
 
+    write_to_excel_with_individual_formatting(output_file, routing_cost)
+    print(f"\nDataFrames have been successfully written to {output_file}\n")
 
 if __name__ == "__main__":
     main()

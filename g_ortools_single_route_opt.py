@@ -12,12 +12,12 @@ gmaps = googlemaps.Client(key='***REMOVED***')
 # Dictionary of all unique locations
 delivery_points = {
     "PLISA": (13.814771381058584, -89.40960526517033),
-    "C1": (14.573568892732993, -90.54842361137793),
+    "Multitex": (13.729414022787362, -89.18832722181165)
 }
 
 number_of_vehicles = 1
 # Number of vehicles/routes available
-max_stores_per_vehicle = 4  # Maximum number of stores per vehicle
+max_stores_per_vehicle = 3  # Maximum number of stores per vehicle
 
 # Exclude PLISA from clustering but include it in the routes
 cluster_points = {key: val for key, val in delivery_points.items() if key != 'PLISA'}
