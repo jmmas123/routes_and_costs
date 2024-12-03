@@ -3,64 +3,48 @@ import numpy as np
 from sklearn.cluster import KMeans
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 import folium
+import os
+import pandas as pd
 
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
 
-# Dictionary of all unique locations
-# delivery_points = {
-#     "PLISA": (13.814771381058584, -89.40960526517033),
-#     "C1": (13.700274849301179, -89.19658727198426),
-#     "C2": (13.699592083787923, -89.18796916668566),
-#     "Zacatecoluca": (13.508156875451148, -88.87071996613791),
-#     "Usulutan": (13.343501570460036, -88.43294264877568),
-#     "San Miguel": (13.482360485812624, -88.17610609308709),
-#     "San Miguel EE": (13.463518936844718, -88.16620547920196),
-#     "San Vicente": (13.643651339058886, -88.78490442744153),
-#     "Gotera": (13.697070523244175, -88.10436389687582),
-#     "Soyapango": (13.702721412595531, -89.1488075058194),
-#     "Venecia": (13.715569379866428, -89.14405464527051),
-#     "San Martin": (13.73715057948368, -89.055748653535),
-#     "Quezaltepeque": (13.831238182901616, -89.27163100009051),
-#     "Metro Sur": (13.704360322759676, -89.21402777415823),
-#     "Salvador del mundo": (13.701135550084564, -89.22052841523039),
-#     "Santa Tecla": (13.67294569959625, -89.28502017015064),
-#     "Cascadas": (13.678180325512601, -89.25021950575061),
-#     "Chalchuapa": (13.985296777730383, -89.6775984964213),
-#     "Ahuachapan": (13.924841153067355, -89.84505308415532),
-#     "Metapan": (14.33101137444799, -89.44344776909121),
-#     "Santa Ana": (13.993745561931757, -89.5575659095613),
-#     "Lourdes": (13.722546962095567, -89.36819169097939),
-#     "Sonsonate": (13.717906246822801, -89.72425805578887),
-#     "Apopa": (13.79996666691705, -89.17740146468317),
-#     "San Luis": (13.71587512531585, -89.21281628594396),
-#     "Mercado": (13.70035372408547, -89.19660503156757),
-#     "Mejicanos": (13.722615588871603, -89.18888120921),
-#     "Cojute": (13.722794399195264, -88.93393263231938),
-#     "Ilobasco": (13.842682983328299, -88.85068395980095),
-#     "Aguilares": (13.957413890800401, -89.18619658970312),
-#     "Chalatenango": (14.042284566312114, -88.93687057229887),
-#     # Add other locations as needed
-# }
+pd.set_option(
+    "display.max_rows", None,
+    "display.max_columns", None,
+    "display.expand_frame_repr", False
+)
 
+# Define the paths to your data files
+def get_base_path(file_type):
+    if os.name == 'nt':  # Windows
+        if file_type == 'routing':
+            return r'\\192.168.10.18\Bodega General\HE\VARIOS\rutas'
+    else:  # MacOS
+        if file_type == 'routing':
+            return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+
+
+# Get base paths
+overtime_t_base_path = get_base_path('routing')
+
+income_overtime_client_path = os.path.join(overtime_t_base_path, 'control de rutas y fletes.xlsx')
+
+# Read document containing Routing information
+df_control = pd.read_excel(income_overtime_client_path, sheet_name='ISSS_J')
+
+
+print("Destinations for analysis:\n", df_control)
+
+# Converting to dictionary
 delivery_points = {
-    "PLISA": (13.814771381058584, -89.40960526517033),
-    "CLINICA COMUNAL SAN ANTONIO ABAD": (13.718416415667132, -89.2195469790508),
-    "CLINICA COMUNAL AYUTUXTEPEQUE": (13.737943237208079, -89.20289504836228),
-    "CLINICA COMUNAL MIRAMONTE": (13.706982975688963, -89.21776625815096),
-    "CLINICA COMUNAL VIRGEN DEL TRANSITO": (13.722269548367766, -89.19020031952664),
-    "CLINICA COMUNAL LAS VICTORIAS": (13.720284317168453, -89.2076645479249),
-    "UNIDAD MÉDICA SANTA TECLA": (13.670811309389247, -89.29303392703117),
-    "CLÍNICA COMUNAL ANTIGUO CUSCATLÁN": (13.675932752635452, -89.24041547361482),
-    "CLÍNICA COMUNAL SAN ANTONIO": (13.678145714256052, -89.28667247163402),
-    "CLÍNICA COMUNAL SANTA MÓNICA": (13.680023876267704, -89.28443997908205),
-    "CLÍNICA COMUNAL  MERLIOT": (13.674565209134625, -89.26385645395045),
-    "CLÍNICA COMUNAL SITIO DEL NIÑO": (13.78448916267406, -89.37323549998),
+    row['Direccion']: tuple(map(float, row['Coordenada'].split(', ')))
+    for _, row in df_control.iterrows()
 }
 
-number_of_vehicles = 1
+number_of_vehicles = 6
 # Number of vehicles/routes available
-max_stores_per_vehicle = 12  # Maximum number of stores per vehicle
+max_stores_per_vehicle = 6  # Maximum number of stores per vehicle
 
 # Exclude PLISA from clustering but include it in the routes
 cluster_points = {key: val for key, val in delivery_points.items() if key != 'PLISA'}
@@ -180,7 +164,7 @@ def draw_route(route, color):
         folium.Marker(delivery_points[point], icon=folium.Icon(color=color), popup=point).add_to(m)
 
 # Colors for different routes
-colors = ['black', 'darkpurple', 'blue', 'green', 'lightred', 'gray', 'cadetblue', 'darkgreen', 'lightblue',
+colors = ['black', 'blue', 'green', 'gray', 'cadetblue', 'darkgreen', 'lightblue',
  'purple', 'pink', 'orange', 'red', 'lightgreen', 'darkred', 'lightgray', 'darkblue', 'cyan', 'magenta', 'yellow']
 
 
@@ -240,50 +224,6 @@ for idx, points in final_clusters.items():
 # Print the total kilometers for all routes
 print(f'Total Distance for all routes: {total_km_all_routes:.2f} km')
 
-# # Process each final cluster for routing
-# for idx, points in final_clusters.items():
-#     if len(points) > 1:  # Only process clusters with delivery points
-#         distance_matrix, time_matrix = create_distance_and_time_matrix(points)
-#         manager = pywrapcp.RoutingIndexManager(len(distance_matrix), 1, 0)
-#         routing = pywrapcp.RoutingModel(manager)
-#
-#
-#         # Distance callback
-#         def distance_callback(from_index, to_index):
-#             from_node = manager.IndexToNode(from_index)
-#             to_node = manager.IndexToNode(to_index)
-#             return distance_matrix[from_node][to_node]
-#
-#
-#         transit_callback_index = routing.RegisterTransitCallback(distance_callback)
-#         routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
-#
-#         # Search parameters
-#         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-#         search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
-#
-#         # Solve the problem
-#         solution = routing.SolveWithParameters(search_parameters)
-#         if solution:
-#             index = routing.Start(0)
-#             route = []
-#             total_distance_km = 0
-#             total_time_hrs = 0
-#             while not routing.IsEnd(index):
-#                 next_index = solution.Value(routing.NextVar(index))
-#                 route.append(points[manager.IndexToNode(index)])
-#                 total_distance_km += distance_matrix[manager.IndexToNode(index)][
-#                                          manager.IndexToNode(next_index)] / 1000  # Meters to km
-#                 total_time_hrs += time_matrix[manager.IndexToNode(index)][manager.IndexToNode(next_index)]
-#                 index = next_index
-#             route.append('PLISA')  # Append PLISA to close the loop if round trip is needed
-#             print(f'Route for Cluster {idx + 1}:')
-#             print(' -> '.join(route))
-#             print(f'Total Distance: {total_distance_km:.2f} km')
-#             print(f'Total Travel Time: {total_time_hrs:.2f} hours\n')
-#             draw_route(route, colors[idx % len(colors)])
-#         else:
-#             print(f"No feasible route found for Cluster {idx + 1}.")
 
 # Save the map to an HTML file
 m.save('routes_map_google_or_maps_v2.html')
