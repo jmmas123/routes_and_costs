@@ -31,7 +31,7 @@ overtime_t_base_path = get_base_path('routing')
 income_overtime_client_path = os.path.join(overtime_t_base_path, 'control de rutas y fletes.xlsx')
 
 # Read document containing Routing information
-df_control = pd.read_excel(income_overtime_client_path, sheet_name='ISSS_J')
+df_control = pd.read_excel(income_overtime_client_path, sheet_name='ISSS_N')
 
 
 print("Destinations for analysis:\n", df_control)
@@ -42,7 +42,7 @@ delivery_points = {
     for _, row in df_control.iterrows()
 }
 
-number_of_vehicles = 6
+number_of_vehicles = 4
 # Number of vehicles/routes available
 max_stores_per_vehicle = 6  # Maximum number of stores per vehicle
 

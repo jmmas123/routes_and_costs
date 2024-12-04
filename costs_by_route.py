@@ -54,7 +54,7 @@ def load_data():
     df_salary = pd.read_excel(workforce_and_salaries_path, sheet_name='Hora regular', header=0)
     # Read document containing Routing information
     df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
-    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='ISSS')
+    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='COSTOS_ISSS_N')
     # Read document containing Route delivery points
     df_rutas = pd.read_excel(income_overtime_client_path, sheet_name='Rutas')
     # Read document containing Truck information
@@ -93,7 +93,7 @@ def clean_time_format(df, time_column):
             cleaned_time = cleaned_time.replace(".", "").upper()  # Replace periods and ensure uppercase "AM"/"PM"
             try:
                 # Convert to datetime format
-                return pd.to_datetime(cleaned_time, format='%I:%M %p').time()
+                return pd.to_datetime(cleaned_time, format="%H:%M:%S").time()
             except ValueError:
                 print(f"Unable to parse time: {time_str}")
                 return None  # Return None if the time format is incorrect
@@ -200,7 +200,7 @@ def process_control_df(df_control, df_salary, df_camiones, df_precios):
                 hora_fin = row['Hora Fin']
                 if pd.notna(hora_inicio) and pd.notna(hora_fin):
                     try:
-                        time_format = '%I:%M %p'  # Handle AM/PM format
+                        time_format = "%H:%M:%S"  # Handle AM/PM format
                         t_inicio = pd.to_datetime(hora_inicio, format=time_format)
                         t_fin = pd.to_datetime(hora_fin, format=time_format)
                         unloading_time = (t_fin - t_inicio).total_seconds() / 3600  # in hours
