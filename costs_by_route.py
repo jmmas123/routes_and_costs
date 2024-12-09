@@ -53,8 +53,8 @@ def load_data():
     # Read document containing salaries and workforce
     df_salary = pd.read_excel(workforce_and_salaries_path, sheet_name='Hora regular', header=0)
     # Read document containing Routing information
-    df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
-    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='COSTOS_ISSS_N')
+    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
+    df_control = pd.read_excel(income_overtime_client_path, sheet_name='Costeo')
     # Read document containing Route delivery points
     df_rutas = pd.read_excel(income_overtime_client_path, sheet_name='Rutas')
     # Read document containing Truck information
@@ -410,85 +410,6 @@ def clean_dataframe(routes_df):
 
     return routes_df
 
-def write_to_excel_with_individual_formatting(output_file,
-                                              df_routing_costs,
-                                              df_client_summary,
-                                              df_general_totals):
-    """
-    Writes multiple DataFrames to an Excel file with custom formatting for individual sheets.
-
-    Args:
-        output_file (str): Path to the output Excel file.
-        df_routing_costs (DataFrame): DataFrame containing detailed routing costs.
-        df_client_summary (DataFrame): DataFrame summarizing costs by client.
-        df_general_totals (DataFrame): DataFrame containing overall totals.
-    """
-    # Define sheet names and corresponding DataFrames
-    sheet_mapping = {
-        'Routing Costs': df_routing_costs,
-        'Client Summary': df_client_summary,
-        'General Totals': df_general_totals
-    }
-
-    # Create the ExcelWriter object
-    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
-        workbook = writer.book
-
-        # Define formatting styles
-        header_format = workbook.add_format({'bold': True, 'bg_color': '#D3D3D3', 'border': 1})
-        date_format = workbook.add_format({'num_format': 'yyyy-mm-dd'})
-        regular_number_format = workbook.add_format({'num_format': '#,##0.00'})
-        accounting_format = workbook.add_format({'num_format': '$#,##0.00'})
-
-        # Write each DataFrame to its own sheet with formatting
-        for sheet_name, dataframe in sheet_mapping.items():
-            # Write the DataFrame
-            dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
-            worksheet = writer.sheets[sheet_name]
-
-            # Apply header formatting and adjust column widths
-            for col_num, header in enumerate(dataframe.columns):
-                worksheet.write(0, col_num, header, header_format)
-                col_width = max(len(header) + 2, dataframe[header].astype(str).map(len).max() + 2)
-                worksheet.set_column(col_num, col_num, col_width)
-
-            # Apply custom formatting based on the sheet
-            if sheet_name == 'Routing Costs':
-                # Format the 'Date' column if it exists
-                if 'Date' in dataframe.columns:
-                    date_col_idx = dataframe.columns.get_loc('Date')
-                    worksheet.set_column(date_col_idx, date_col_idx, 12, date_format)
-
-                # Format monetary columns
-                for col_name in ['Total gas cost', 'Total wage cost', 'Total route cost']:
-                    if col_name in dataframe.columns:
-                        col_idx = dataframe.columns.get_loc(col_name)
-                        worksheet.set_column(col_idx, col_idx, 15, accounting_format)
-
-            elif sheet_name == 'Client Summary':
-                # Format numeric columns
-                for col_name in ['Total delivery points', 'Total Km traveled']:
-                    if col_name in dataframe.columns:
-                        col_idx = dataframe.columns.get_loc(col_name)
-                        worksheet.set_column(col_idx, col_idx, 10, regular_number_format)
-
-                # Format monetary columns
-                for col_name in ['Total gas cost', 'Total wage cost', 'Total route cost']:
-                    if col_name in dataframe.columns:
-                        col_idx = dataframe.columns.get_loc(col_name)
-                        worksheet.set_column(col_idx, col_idx, 15, accounting_format)
-
-            elif sheet_name == 'General Totals':
-                # Format monetary columns
-                for col_name in ['Total gas cost', 'Total wage cost', 'Total route cost']:
-                    if col_name in dataframe.columns:
-                        col_idx = dataframe.columns.get_loc(col_name)
-                        worksheet.set_column(col_idx, col_idx, 15, accounting_format)
-
-    print(f"\nDataFrames have been successfully written to {output_file}\n")
-
-
-
 
 def general_cost_calculation(routes_df):
     # Ensure the date column is properly extracted
@@ -556,15 +477,17 @@ def write_to_excel_with_individual_formatting(output_file, cost_df):
             # Apply specific formatting for "Horas en bodega" sheet (Sheet 1)
             if sheet_name == 'Cotizacion de ruteo':
                 # Column 1 (Date) formatting
-                worksheet.set_column(0, 0, 20)  # Delivery points
-                worksheet.set_column(1, 1, 20, regular_number_format)  # Total Delivery points
-                worksheet.set_column(2, 2, 18, regular_number_format)   # Total KM traveled
-                worksheet.set_column(3, 3, 18, accounting_format)   # Total gas cost
-                worksheet.set_column(4, 4, 20, regular_number_format)   # Total unloading time
-                worksheet.set_column(5, 5, 18, regular_number_format)   # Total driving time
-                worksheet.set_column(6, 6, 22, regular_number_format)   # Number of aux personel
-                worksheet.set_column(7, 7, 18, accounting_format)   # Total wage cost
-                worksheet.set_column(8, 8, 18, accounting_format)   # Total route cost
+                worksheet.set_column(0, 0, 20, date_format)  # Date
+                worksheet.set_column(1, 1, 20)  # Route name
+                worksheet.set_column(2, 2, 18)   # Client
+                worksheet.set_column(3, 3, 18, regular_number_format)   # Total delivery points
+                worksheet.set_column(4, 4, 20, regular_number_format)   # Total km traveled
+                worksheet.set_column(5, 5, 18, accounting_format)   # Total gas cost
+                worksheet.set_column(6, 6, 22, regular_number_format)   # Unloading time
+                worksheet.set_column(7, 7, 18, regular_number_format)   # Driving time
+                worksheet.set_column(8, 8, 18, regular_number_format)   # Number of aux personnel
+                worksheet.set_column(9, 9, 18, accounting_format)  # Total wage Cost
+                worksheet.set_column(10, 10, 18, accounting_format)  # Total route cost
 
 
 def main():

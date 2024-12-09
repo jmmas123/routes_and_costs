@@ -42,9 +42,9 @@ delivery_points = {
     for _, row in df_control.iterrows()
 }
 
-number_of_vehicles = 4
+number_of_vehicles = 1
 # Number of vehicles/routes available
-max_stores_per_vehicle = 6  # Maximum number of stores per vehicle
+max_stores_per_vehicle = 6 # Maximum number of stores per vehicle
 
 # Exclude PLISA from clustering but include it in the routes
 cluster_points = {key: val for key, val in delivery_points.items() if key != 'PLISA'}
