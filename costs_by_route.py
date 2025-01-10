@@ -3,18 +3,26 @@ import googlemaps
 import numpy as np
 import pandas as pd
 import os
+import socket
 from datetime import time
 
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
 
-
+# Function to get the base output path
 def get_base_output_path():
     if os.name == 'nt':  # Windows
-        obase_path = r'C:\Users\josemaria\Downloads'
-    else:  # MacOS (or others)
-        obase_path = r'/Users/j.m./Downloads'
-    return obase_path
+        return r'C:\Users\josemaria\Downloads'
+    else:  # macOS or others
+        hostname = socket.gethostname()
+        print(f"Detected hostname: {hostname}")
+        if hostname == 'JM-MS.local':  # Replace with your Mac Studio's hostname
+            return r'/Users/jm/Downloads'
+        elif hostname == 'MacBook-Pro-Name.local':  # Replace with your MacBook Pro's hostname
+            return r'/Users/j.m./Downloads'
+        else:
+            print(f"Warning: Unknown hostname {hostname}. Using fallback path.")
+            return r'/Users/default_user/Downloads'  # Default fallback path
 
 
 def load_data():
@@ -25,17 +33,42 @@ def load_data():
                 return r'\\192.168.10.18\Bodega General\HE\VARIOS\Horas'
             elif file_type == 'routing':
                 return r'\\192.168.10.18\Bodega General\HE\VARIOS\rutas'
-                # return r'C:\JM\GM\MOBU - OPL\Rutas'
             elif file_type == 'workforce':
                 return r'C:\JM\GM\MOBU - OPL\Planilla'
-        else:  # MacOS
-            if file_type == 'overtime':
-                return (r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - '
-                        r'OPL/Horas extra')
-            if file_type == 'routing':
-                return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
-            elif file_type == 'workforce':
-                return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
+            else:
+                raise ValueError(f"Unknown file type: {file_type}")
+        else:  # macOS or others
+            hostname = socket.gethostname()
+            print(f"Detected hostname: {hostname}")
+            if hostname == 'JM-MS.local':  # Replace with Mac Studio hostname
+                if file_type == 'overtime':
+                    return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/Horas'
+                elif file_type == 'routing':
+                    return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+                elif file_type == 'workforce':
+                    return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
+                else:
+                    raise ValueError(f"Unknown file type: {file_type}")
+            elif hostname == 'MacBook-Pro-Name.local':  # Replace with MacBook Pro hostname
+                if file_type == 'overtime':
+                    return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/Horas'
+                elif file_type == 'routing':
+                    return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+                elif file_type == 'workforce':
+                    return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
+                else:
+                    raise ValueError(f"Unknown file type: {file_type}")
+            else:
+                print(f"Warning: Unknown hostname {hostname}. Using fallback paths.")
+                # Default fallback paths for macOS
+                if file_type == 'overtime':
+                    return r'/Users/default_user/HE/VARIOS/Horas'
+                elif file_type == 'routing':
+                    return r'/Users/default_user/HE/VARIOS/rutas'
+                elif file_type == 'workforce':
+                    return r'/Users/default_user/Planilla'
+                else:
+                    raise ValueError(f"Unknown file type: {file_type}")
 
     # Get base paths
     overtime_t_base_path = get_base_path('routing')
