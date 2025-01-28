@@ -4,10 +4,18 @@ import numpy as np
 import pandas as pd
 import os
 import socket
-from datetime import time
+from datetime import time, datetime
 
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
+
+def parse_date(date_str):
+    for fmt in ('%d-%m-%Y', '%d-%m-%y', '%d/%m/%Y', '%d/%m/%y'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError("Invalid date format. Please enter dates in dd/mm/yy or dd-mm-yy format.")
 
 # Function to get the base output path
 def get_base_output_path():
@@ -17,9 +25,9 @@ def get_base_output_path():
         hostname = socket.gethostname()
         print(f"Detected hostname: {hostname}")
         if hostname == 'JM-MS.local':  # Replace with your Mac Studio's hostname
-            return r'/Users/jm/Downloads'
-        elif hostname == 'MacBook-Pro-Name.local':  # Replace with your MacBook Pro's hostname
-            return r'/Users/j.m./Downloads'
+            return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/Downloads'
+        elif hostname == 'JM-MBP.local':  # Replace with your MacBook Pro's hostname
+            return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/Downloads'
         else:
             print(f"Warning: Unknown hostname {hostname}. Using fallback path.")
             return r'/Users/default_user/Downloads'  # Default fallback path
@@ -49,7 +57,7 @@ def load_data():
                     return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
                 else:
                     raise ValueError(f"Unknown file type: {file_type}")
-            elif hostname == 'MacBook-Pro-Name.local':  # Replace with MacBook Pro hostname
+            elif hostname == 'JM-MBP.local':  # Replace with MacBook Pro hostname
                 if file_type == 'overtime':
                     return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/Horas'
                 elif file_type == 'routing':
@@ -522,6 +530,21 @@ def write_to_excel_with_individual_formatting(output_file, cost_df):
                 worksheet.set_column(9, 9, 18, accounting_format)  # Total wage Cost
                 worksheet.set_column(10, 10, 18, accounting_format)  # Total route cost
 
+def filter_data_by_date(df, date_column, start_date, end_date):
+    """
+    Filter a DataFrame based on a date range.
+
+    Args:
+        df (pd.DataFrame): DataFrame to be filtered.
+        date_column (str): Column name containing date values.
+        start_date (pd.Timestamp): Start date of the range.
+        end_date (pd.Timestamp): End date of the range.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    df[date_column] = pd.to_datetime(df[date_column])  # Ensure date column is in datetime format
+    return df[(df[date_column] >= start_date) & (df[date_column] <= end_date)]
 
 def main():
     pd.set_option(
@@ -530,9 +553,33 @@ def main():
         "display.expand_frame_repr", False
     )
 
+
+    start_date_str = input("Enter the start date of analysis (dd/mm/yy or dd-mm-yy): ")
+    end_date_str = input("Enter the end date of analysis (dd/mm/yy or dd-mm-yy): ")
+
+    # Convert to datetime with error handling
+    try:
+        start_date = parse_date(start_date_str)
+        end_date = parse_date(end_date_str)
+
+        if start_date > end_date:
+            print("Error: Start date must be before or equal to end date.")
+            return
+
+        # Convert to pandas Timestamp for compatibility with DataFrame date columns
+        start_date = pd.Timestamp(start_date)
+        end_date = pd.Timestamp(end_date)
+    except ValueError as e:
+        print(e)
+        return
+
     print("Main: Loading data...")
 
     df_delivery_overtime, df_salary, df_control, df_rutas, df_camiones, df_precios = load_data()
+
+    # Apply date filtering
+    df_control = filter_data_by_date(df_control, 'Fecha', start_date, end_date)
+    df_delivery_overtime = filter_data_by_date(df_delivery_overtime, 'Fecha', start_date, end_date)
 
     df_control = clean_time_format(df_control, 'Hora Inicio')
     df_control = clean_time_format(df_control, 'Hora Fin')

@@ -4,15 +4,26 @@ import numpy as np
 import pandas as pd
 import os
 from datetime import time
+from datetime import datetime
 
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
+
+
+def parse_date(date_str):
+    for fmt in ('%d-%m-%Y', '%d-%m-%y', '%d/%m/%Y', '%d/%m/%y'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError("Invalid date format. Please enter dates in dd/mm/yy or dd-mm-yy format.")
+
 
 def get_base_output_path():
     if os.name == 'nt':  # Windows
         obase_path = r'C:\Users\josemaria\Downloads'
     else:  # MacOS (or others)
-        obase_path = r'/Users/j.m./Downloads'
+        obase_path = r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/Downloads'
     return obase_path
 
 def load_data():
@@ -28,12 +39,12 @@ def load_data():
                 return r'C:\JM\GM\MOBU - OPL\Planilla'
         else:  # MacOS
             if file_type == 'overtime':
-                return (r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - '
-                        r'OPL/Horas extra')
+                return (r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - '
+                        r'OPL/HE/VARIOS/HORAS')
             if file_type == 'routing':
-                return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+                return '/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
             elif file_type == 'workforce':
-                return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
+                return '/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
 
     # Get base paths
     overtime_t_base_path = get_base_path('routing')
@@ -51,7 +62,7 @@ def load_data():
     df_salary = pd.read_excel(workforce_and_salaries_path, sheet_name='Hora regular', header=0)
     # Read document containing Routing information
     df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
-    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='ISSS')
+    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='Costeo')
     # Read document containing Route delivery points
     df_rutas = pd.read_excel(income_overtime_client_path, sheet_name='Rutas')
     # Read document containing Truck information
@@ -482,6 +493,23 @@ def calculate_distances_and_times(routes_df, gmaps):
     return legs_df
 
 
+def filter_data_by_date(df, date_column, start_date, end_date):
+    """
+    Filter a DataFrame based on a date range.
+
+    Args:
+        df (pd.DataFrame): DataFrame to be filtered.
+        date_column (str): Column name containing date values.
+        start_date (pd.Timestamp): Start date of the range.
+        end_date (pd.Timestamp): End date of the range.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    df[date_column] = pd.to_datetime(df[date_column])  # Ensure date column is in datetime format
+    return df[(df[date_column] >= start_date) & (df[date_column] <= end_date)]
+
+
 def main():
     pd.set_option(
         "display.max_rows", None,
@@ -489,28 +517,50 @@ def main():
         "display.expand_frame_repr", False
     )
 
+    start_date_str = input("Enter the start date of analysis (dd/mm/yy or dd-mm-yy): ")
+    end_date_str = input("Enter the end date of analysis (dd/mm/yy or dd-mm-yy): ")
+
+    # Convert to datetime with error handling
+    try:
+        start_date = parse_date(start_date_str)
+        end_date = parse_date(end_date_str)
+
+        if start_date > end_date:
+            print("Error: Start date must be before or equal to end date.")
+            return
+
+        # Convert to pandas Timestamp for compatibility with DataFrame date columns
+        start_date = pd.Timestamp(start_date)
+        end_date = pd.Timestamp(end_date)
+    except ValueError as e:
+        print(e)
+        return
+
     print("Main: Loading data...")
 
+    # Load data
     df_delivery_overtime, df_salary, df_control, df_rutas, df_camiones, df_precios = load_data()
 
+    print("Filtering data by date range...")
+
+    # Apply date filtering
+    df_control = filter_data_by_date(df_control, 'Fecha', start_date, end_date)
+    df_delivery_overtime = filter_data_by_date(df_delivery_overtime, 'Fecha', start_date, end_date)
+
+    # Clean time columns in df_control
     df_control = clean_time_format(df_control, 'Hora Inicio')
     df_control = clean_time_format(df_control, 'Hora Fin')
 
     # Process Control df to create routes
     routes_df = process_control_df(df_control, df_salary, df_camiones, df_precios)
 
+    # Calculate distances and times for filtered data
     routes_calc = calculate_distances_and_times(routes_df, gmaps)
 
-
-
-    # # Save the results to a CSV file
-    # output_path = os.path.join(get_base_output_path(), 'warehouse_proportional_operations.csv')
-    # df_warehouse_proportional.to_csv(output_path, index=False)
-    # print(f"\nResults saved to {output_path}")
-    #
-    # output_path = os.path.join(get_base_output_path(), 'warehouse_grouped_client.csv')
-    # grouped_warehouse.to_csv(output_path, index=False)
-    # print(f"\nResults saved to {output_path}")
+    # Optional: Save results
+    output_path = os.path.join(get_base_output_path(), 'costos_de_ruta(27-01-25).csv')
+    routes_calc.to_csv(output_path, index=False)
+    print(f"Results saved to {output_path}")
 
 
 if __name__ == "__main__":
