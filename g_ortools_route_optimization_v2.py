@@ -22,7 +22,7 @@ def get_base_path(file_type):
             return r'\\192.168.10.18\Bodega General\HE\VARIOS\rutas'
     else:  # MacOS
         if file_type == 'routing':
-            return '/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+            return '/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
 
 
 # Get base paths
@@ -42,9 +42,9 @@ delivery_points = {
     for _, row in df_control.iterrows()
 }
 
-number_of_vehicles = 1
+number_of_vehicles = 5
 # Number of vehicles/routes available
-max_stores_per_vehicle = 6 # Maximum number of stores per vehicle
+max_stores_per_vehicle = 3 # Maximum number of stores per vehicle
 
 # Exclude PLISA from clustering but include it in the routes
 cluster_points = {key: val for key, val in delivery_points.items() if key != 'PLISA'}

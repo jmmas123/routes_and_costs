@@ -6,8 +6,11 @@ import os
 import socket
 from datetime import time, datetime
 
-# Initialize Google Maps API client
-gmaps = googlemaps.Client(key='***REMOVED***')
+from dotenv import load_dotenv
+load_dotenv()
+
+GMAPS_API_KEY = os.getenv("GMAPS_API_KEY")
+gmaps = googlemaps.Client(key=GMAPS_API_KEY)
 
 def parse_date(date_str):
     for fmt in ('%d-%m-%Y', '%d-%m-%y', '%d/%m/%Y', '%d/%m/%y'):
@@ -17,21 +20,23 @@ def parse_date(date_str):
             continue
     raise ValueError("Invalid date format. Please enter dates in dd/mm/yy or dd-mm-yy format.")
 
-# Function to get the base output path
-def get_base_output_path():
-    if os.name == 'nt':  # Windows
-        return r'C:\Users\josemaria\Downloads'
-    else:  # macOS or others
-        hostname = socket.gethostname()
-        print(f"Detected hostname: {hostname}")
-        if hostname == 'JM-MS.local':  # Replace with your Mac Studio's hostname
-            return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/Downloads'
-        elif hostname == 'JM-MBP.local':  # Replace with your MacBook Pro's hostname
-            return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/Downloads'
-        else:
-            print(f"Warning: Unknown hostname {hostname}. Using fallback path.")
-            return r'/Users/default_user/Downloads'  # Default fallback path
+def get_clean_hostname():
+    hostname = socket.gethostname()
+    if hostname.endswith('.local'):
+        hostname = hostname.replace('.local', '')
+    return hostname
 
+
+def get_base_output_path():
+    if os.name == 'nt':
+        return r'C:\Users\josemaria\Downloads'
+    else:
+        hostname = get_clean_hostname()
+        if hostname == 'JM-MBP':
+            return '/Users/j.m./Downloads'
+        elif hostname == 'JM-MS':
+            return '/Users/jm/Downloads'
+        return None
 
 def load_data():
     # Define the paths to your data files
@@ -50,18 +55,18 @@ def load_data():
             print(f"Detected hostname: {hostname}")
             if hostname == 'JM-MS.local':  # Replace with Mac Studio hostname
                 if file_type == 'overtime':
-                    return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/Horas'
+                    return r'/Volumes/mobu/supervisores/HE/VARIOS/Horas'
                 elif file_type == 'routing':
-                    return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+                    return '/Volumes/mobu/supervisores/HE/VARIOS/rutas'
                 elif file_type == 'workforce':
                     return r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
                 else:
                     raise ValueError(f"Unknown file type: {file_type}")
             elif hostname == 'JM-MBP.local':  # Replace with MacBook Pro hostname
                 if file_type == 'overtime':
-                    return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/Horas'
+                    return r'/Volumes/mobu/supervisores/HE/VARIOS/Horas'
                 elif file_type == 'routing':
-                    return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/HE/VARIOS/rutas'
+                    return '/Volumes/mobu/supervisores/HE/VARIOS/rutas'
                 elif file_type == 'workforce':
                     return r'/Users/j.m./Library/Mobile Documents/com~apple~CloudDocs/GM/MOBU - OPL/Planilla'
                 else:
@@ -84,7 +89,7 @@ def load_data():
     workforce_base_path = get_base_path('workforce')
 
     # Construct file paths
-    overtime_file_path = os.path.join(overtime_base_path, 'Horas extra NF.xlsx')
+    overtime_file_path = os.path.join(overtime_base_path, 'Horas extra NF2.xlsx')
     workforce_and_salaries_path = os.path.join(workforce_base_path, 'Reporte de personal MORIBUS.xlsx')
     income_overtime_client_path = os.path.join(overtime_t_base_path, 'control de rutas y fletes.xlsx')
 
@@ -484,6 +489,36 @@ def general_cost_calculation(routes_df):
 
     return cost_df
 
+def pricing(routes_calc_df, margin, method):
+    """
+    Calculate price based on cost and margin, using either cost-based or selling price-based margin method.
+
+    Args:
+        routes_calc_df (pd.DataFrame): DataFrame containing at least a 'Total route cost' column.
+        margin (float): Margin value between 0 and 1 (exclusive).
+        method (str): 'cost' for cost-based margin or 'price' for selling price-based margin.
+
+    Returns:
+        pd.DataFrame: Updated DataFrame with a new 'Price' column.
+    """
+    if not 0 <= margin < 1:
+        raise ValueError(f"Margin must be between 0 (inclusive) and 1 (exclusive). Got: {margin}")
+
+    if method not in ['cost', 'price']:
+        raise ValueError(f"Method must be either 'cost' or 'price'. Got: {method}")
+
+    if 'Total route cost' not in routes_calc_df.columns:
+        raise KeyError("'Total route cost' column not found in the DataFrame.")
+
+    routes_calc_df = routes_calc_df.copy()
+
+    if method == 'cost':
+        routes_calc_df['Price'] = routes_calc_df['Total route cost'] * (1 + margin)
+    elif method == 'price':
+        routes_calc_df['Price'] = routes_calc_df['Total route cost'] / (1 - margin)
+
+    return routes_calc_df
+
 
 
 def write_to_excel_with_individual_formatting(output_file, cost_df):
@@ -554,8 +589,19 @@ def main():
     )
 
 
-    start_date_str = input("Enter the start date of analysis (dd/mm/yy or dd-mm-yy): ")
-    end_date_str = input("Enter the end date of analysis (dd/mm/yy or dd-mm-yy): ")
+    # start_date_str = input("Enter the start date of analysis (dd/mm/yy or dd-mm-yy): ")
+    # end_date_str = input("Enter the end date of analysis (dd/mm/yy or dd-mm-yy): ")
+
+    start_date_str = "01/09/2025"
+    end_date_str = "25/09/2025"
+
+    # margin = input("Enter margin as decimal points (e.g. 0.3 for 30%): ")
+    # margin = float(margin)
+    # method = input("Select 'cost' or 'price': ")
+
+    margin = 0.35
+    margin = float(margin)
+    method = 'price'
 
     # Convert to datetime with error handling
     try:
@@ -595,10 +641,14 @@ def main():
 
     routing_cost = general_cost_calculation(routes_calc_df)
 
-    # Define the output path and file name
-    output_file = os.path.join(get_base_output_path(), 'Costos de ruteo.xlsx')
+    routing_price = pricing(routing_cost, margin, method)
 
-    write_to_excel_with_individual_formatting(output_file, routing_cost)
+    print("Final output:\n", routing_price)
+
+    # Define the output path and file name
+    output_file = os.path.join(get_base_output_path(), 'Costos de ruteo nuevo esquema 2606-2507.xlsx')
+
+    write_to_excel_with_individual_formatting(output_file, routing_price)
     print(f"\nDataFrames have been successfully written to {output_file}\n")
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import pandas as pd
 import os
 from datetime import time
 from datetime import datetime
+import socket
 
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
@@ -18,22 +19,32 @@ def parse_date(date_str):
             continue
     raise ValueError("Invalid date format. Please enter dates in dd/mm/yy or dd-mm-yy format.")
 
+def get_clean_hostname():
+    hostname = socket.gethostname()
+    if hostname.endswith('.local'):
+        hostname = hostname.replace('.local', '')
+    return hostname
+
 
 def get_base_output_path():
-    if os.name == 'nt':  # Windows
-        obase_path = r'C:\Users\josemaria\Downloads'
-    else:  # MacOS (or others)
-        obase_path = r'/Users/jm/Library/Mobile Documents/com~apple~CloudDocs/Downloads'
-    return obase_path
+    if os.name == 'nt':
+        return r'C:\Users\josemaria\Downloads'
+    else:
+        hostname = get_clean_hostname()
+        if hostname == 'JM-MBP':
+            return '/Users/j.m./Downloads'
+        elif hostname == 'JM-MS':
+            return '/Users/jm/Downloads'
+        return None
 
 def load_data():
     # Define the paths to your data files
     def get_base_path(file_type):
         if os.name == 'nt':  # Windows
             if file_type == 'overtime':
-                return r'\\192.168.10.18\Bodega General\HE\VARIOS\Horas'
+                return r'\\10.5.5.11\mobu\supervisores\HE\VARIOS\Horas'
             elif file_type == 'routing':
-                return r'\\192.168.10.18\Bodega General\HE\VARIOS\rutas'
+                return r'\\10.5.5.11\mobu\supervisores\HE\VARIOS\rutas'
                 # return r'C:\JM\GM\MOBU - OPL\Rutas'
             elif file_type == 'workforce':
                 return r'C:\JM\GM\MOBU - OPL\Planilla'
@@ -558,7 +569,7 @@ def main():
     routes_calc = calculate_distances_and_times(routes_df, gmaps)
 
     # Optional: Save results
-    output_path = os.path.join(get_base_output_path(), 'costos_de_ruta(27-01-25).csv')
+    output_path = os.path.join(get_base_output_path(), 'costos_de_ruta(26-25-02-25).csv')
     routes_calc.to_csv(output_path, index=False)
     print(f"Results saved to {output_path}")
 

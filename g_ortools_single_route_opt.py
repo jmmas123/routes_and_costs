@@ -6,13 +6,23 @@ import folium
 
 # 09/27/2024
 
+# delivery_points = {
+#     "HANEDA": (35.5494429370959, 139.77784388239684),
+#     "HAKONE": (35.23096375274929, 139.028038056898),
+#     "ASABA": (34.97218683767839, 138.9245598369769),
+#     "KYOTO": (35.01395721829809, 135.7651184462139),
+#     "TOKYO": (35.68986949007, 139.372656842858)
+# }
+
 # Initialize Google Maps API client
 gmaps = googlemaps.Client(key='***REMOVED***')
 
 # Dictionary of all unique locations
 delivery_points = {
     "PLISA": (13.814771381058584, -89.40960526517033),
-    "Multitex": (13.729414022787362, -89.18832722181165)
+    "usulutan": (13.343666139763474, -88.43253192149115),
+    "Zacate": (13.508229393828602, -88.87052144692356),
+    "Mercoagro": (13.505569, -88.541656)
 }
 
 number_of_vehicles = 1
