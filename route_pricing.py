@@ -5,9 +5,13 @@ import pandas as pd
 import os
 import socket
 from datetime import time, datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize Google Maps API client
-gmaps = googlemaps.Client(key='***REMOVED***')
+gmaps = googlemaps.Client(key=os.getenv('GMAPS_API_KEY'))
 
 def parse_date(date_str):
     for fmt in ('%d-%m-%Y', '%d-%m-%y', '%d/%m/%Y', '%d/%m/%y'):
@@ -35,7 +39,19 @@ def get_base_output_path():
             return '/Users/jm/Downloads'
         return None
 
-def load_data():
+def load_data(mode='billing'):
+    """
+    Load data files for route pricing calculation.
+
+    Args:
+        mode (str): 'billing' or 'quoting'. Determines which sheet to read from control file.
+
+    Returns:
+        tuple: DataFrames for overtime, salary, control, routes, trucks, prices, and salary_overtime
+    """
+    if mode not in ['billing', 'quoting']:
+        raise ValueError(f"Mode must be 'billing' or 'quoting'. Got: {mode}")
+
     # Define the paths to your data files
     def get_base_path(file_type):
         if os.name == 'nt':  # Windows
@@ -96,9 +112,16 @@ def load_data():
     # Read document containing salaries and workforce
     df_salary = pd.read_excel(workforce_and_salaries_path, sheet_name='Hora regular', header=0)
     df_salary_overtime = pd.read_excel(workforce_and_salaries_path, sheet_name='Empleados', header=0)
-    # Read document containing Routing information
-    df_control = pd.read_excel(income_overtime_client_path, sheet_name='Control de Rutas y Fletes')
-    # df_control = pd.read_excel(income_overtime_client_path, sheet_name='Costeo')
+
+    # Read document containing Routing information - sheet depends on mode
+    if mode == 'billing':
+        control_sheet = 'Control de Rutas y Fletes'
+    else:  # quoting
+        control_sheet = 'Costeo'
+
+    print(f"Loading data in {mode} mode - reading from sheet: '{control_sheet}'")
+    df_control = pd.read_excel(income_overtime_client_path, sheet_name=control_sheet)
+
     # Read document containing Route delivery points
     df_rutas = pd.read_excel(income_overtime_client_path, sheet_name='Rutas')
     # Read document containing Truck information
@@ -121,6 +144,7 @@ def clean_time_format(df, time_column):
     """
     Normalize time format in a specified column of the DataFrame by removing extra periods in "AM" or "PM" suffixes
     and replacing periods between digits with colons for correct time parsing.
+    Handles multiple time formats including 24-hour and 12-hour with AM/PM.
     """
 
     def normalize_time(time_str):
@@ -136,12 +160,26 @@ def clean_time_format(df, time_column):
             cleaned_time = re.sub(r'(\d+)\.(\d+)', r'\1:\2', time_str)
             # Remove any periods in "AM" or "PM" suffix
             cleaned_time = cleaned_time.replace(".", "").upper()  # Replace periods and ensure uppercase "AM"/"PM"
-            try:
-                # Convert to datetime format
-                return pd.to_datetime(cleaned_time, format="%H:%M:%S").time()
-            except ValueError:
-                print(f"Unable to parse time: {time_str}")
-                return None  # Return None if the time format is incorrect
+
+            # Try multiple time formats
+            time_formats = [
+                "%H:%M:%S",      # 24-hour with seconds: 14:30:00
+                "%H:%M",         # 24-hour without seconds: 14:30
+                "%I:%M:%S %p",   # 12-hour with seconds and AM/PM: 02:30:00 PM
+                "%I:%M %p",      # 12-hour without seconds and AM/PM: 02:30 PM
+                "%I:%M:%S%p",    # 12-hour with seconds, no space: 02:30:00PM
+                "%I:%M%p",       # 12-hour without seconds, no space: 02:30PM
+            ]
+
+            for fmt in time_formats:
+                try:
+                    return pd.to_datetime(cleaned_time, format=fmt).time()
+                except ValueError:
+                    continue
+
+            # If all formats fail, print error and return None
+            print(f"Unable to parse time with any known format: '{time_str}' (cleaned: '{cleaned_time}')")
+            return None
         else:
             # For unexpected data types, log and return None
             print(f"Unexpected value type in time column: {time_str} (type: {type(time_str)})")
@@ -237,12 +275,37 @@ def process_control_df(df_control, df_salary, df_camiones, df_precios):
 
             # Unloading time
             unloading = 0
-            for _, row in client_group.iterrows():
+            for idx, row in client_group.iterrows():
                 try:
+                    # Parse times and combine with the route date to handle date rollovers
                     t1 = pd.to_datetime(row['Hora Inicio'], format="%H:%M:%S")
                     t2 = pd.to_datetime(row['Hora Fin'], format="%H:%M:%S")
-                    unloading += (t2 - t1).total_seconds() / 3600
-                except:
+
+                    # Check if times were successfully parsed (not None)
+                    if t1 is None or pd.isna(t1):
+                        raise ValueError(f"Hora Inicio is None or NaN: '{row['Hora Inicio']}'")
+                    if t2 is None or pd.isna(t2):
+                        raise ValueError(f"Hora Fin is None or NaN: '{row['Hora Fin']}'")
+
+                    # Combine with actual date
+                    datetime1 = pd.Timestamp.combine(date.date(), t1.time())
+                    datetime2 = pd.Timestamp.combine(date.date(), t2.time())
+
+                    # If end time is before start time, assume it rolled over to next day
+                    if datetime2 < datetime1:
+                        datetime2 += pd.Timedelta(days=1)
+
+                    unloading += (datetime2 - datetime1).total_seconds() / 3600
+                except (ValueError, TypeError, AttributeError) as e:
+                    print(f"\nWarning: Could not parse unloading times for {row.get('Empresa', 'unknown')}")
+                    print(f"  Error: {e}")
+                    print(f"  Date: {date.date()}")
+                    print(f"  Route: {route_id}")
+                    print(f"  Row index: {idx}")
+                    print(f"  Hora Inicio: '{row.get('Hora Inicio', 'N/A')}'")
+                    print(f"  Hora Fin: '{row.get('Hora Fin', 'N/A')}'")
+                    print(f"  Direccion: '{row.get('Direccion', 'N/A')}'")
+                    print(f"  Defaulting to 1.0 hour for this delivery\n")
                     unloading += 1.0
 
             client_breakdowns.append({
@@ -426,34 +489,21 @@ def cost_calculator(df_delivery, df_salary, start_date=None, end_date=None):
     return df_delivery
 
 def general_cost_calculation(route_summary_df, client_df):
-    # Cost calculation at route level
+    # Cost calculation at route level for shared costs (gas, driving)
     route_summary_df['gas_cost'] = route_summary_df['total_km'] * route_summary_df['gas_cost_per_km']
-    # Merge client unloading times back to route level for billing
+
+    # Calculate total route unloading time for reference
     route_unloading = client_df.groupby('name')['unloading_time'].sum().reset_index()
-    route_summary_df = route_summary_df.merge(route_unloading, on='name', how='left')
+    route_summary_df = route_summary_df.merge(route_unloading, on='name', how='left', suffixes=('', '_total'))
     route_summary_df['unloading_time'] = route_summary_df['unloading_time'].fillna(0)
 
-    # Calculate detailed wage cost breakdown
-    # Driver gets paid for: driving time + unloading time (either doing it or managing aux)
-    route_summary_df['driver_cost'] = (
-        route_summary_df['driver_wage'] * route_summary_df['eta_hours'] +  # Driving
-        route_summary_df['driver_wage'] * route_summary_df['unloading_time']  # Unloading/managing
-    )
+    # Calculate driving cost at route level (to be split proportionally by delivery points)
+    route_summary_df['driver_driving_cost'] = route_summary_df['driver_wage'] * route_summary_df['eta_hours']
 
-    # Auxiliaries get paid for unloading time (only when present)
-    route_summary_df['aux_cost'] = route_summary_df['aux_wage'] * route_summary_df['num_aux'] * route_summary_df['unloading_time']
-
-    route_summary_df['wage_cost'] = route_summary_df['driver_cost'] + route_summary_df['aux_cost']
+    # Store overtime cost
     route_summary_df['overtime_cost'] = route_summary_df.get('overtime_cost', 0).fillna(0)
 
-    # Updated total cost with overtime
-    route_summary_df['total_cost'] = (
-        route_summary_df['gas_cost'] +
-        route_summary_df['wage_cost'] +
-        route_summary_df['overtime_cost']
-    )
-
-    # Merge route total back into client breakdown
+    # Merge route data into client breakdown
     merged = pd.merge(client_df, route_summary_df, on='name', how='left')
 
     # Step 1: get all unique route-date combinations from route_summary_df
@@ -462,20 +512,35 @@ def general_cost_calculation(route_summary_df, client_df):
     # Step 2: find which of those are NOT in overtime_summary
     merged_check = route_dates.merge(merged, on=['route_id', 'date'], how='left', indicator=True)
 
-    # Step 3: keep only the ones that didn’t match
+    # Step 3: keep only the ones that didn't match
     missing = merged_check[merged_check['_merge'] == 'left_only']
     print("Missing overtime rows:\n", missing[['route_id', 'date']])
 
-    # Apply proportional sharing
+    # Apply proportional sharing for shared costs (gas, driving time)
     merged['Total gas cost'] = merged['gas_cost'] * merged['client_proportion']
-    merged['Total driver cost'] = merged['driver_cost'] * merged['client_proportion']
-    merged['Total aux cost'] = merged['aux_cost'] * merged['client_proportion']
-    merged['Total wage cost'] = merged['wage_cost'] * merged['client_proportion']
+    merged['Total driver driving cost'] = merged['driver_driving_cost'] * merged['client_proportion']
     merged['Total overtime cost'] = merged['overtime_cost'] * merged['client_proportion']
-    merged['Total route cost'] = merged['total_cost'] * merged['client_proportion']
 
-    # Clean up duplicate unloading_time columns - use the one from client_df (unloading_time_y)
-    merged['Unloading time (Total)'] = merged['unloading_time_y']
+    # Calculate wage costs based on ACTUAL per-client unloading time (not proportional split)
+    # unloading_time_x is the per-client unloading time from client_df
+    merged['Total driver unloading cost'] = merged['driver_wage'] * merged['unloading_time_x']
+    merged['Total aux cost'] = merged['aux_wage'] * merged['num_aux'] * merged['unloading_time_x']
+
+    # Total driver cost = driving cost (proportional) + unloading cost (actual time)
+    merged['Total driver cost'] = merged['Total driver driving cost'] + merged['Total driver unloading cost']
+
+    # Total wage cost = driver + aux
+    merged['Total wage cost'] = merged['Total driver cost'] + merged['Total aux cost']
+
+    # Total route cost per client
+    merged['Total route cost'] = (
+        merged['Total gas cost'] +
+        merged['Total wage cost'] +
+        merged['Total overtime cost']
+    )
+
+    # Clean up - use the per-client unloading time
+    merged['Unloading time (Total)'] = merged['unloading_time_x']
 
     # Rename and reorder
     merged = merged.rename(columns={
@@ -502,35 +567,87 @@ def summarize_overtime_by_route(df_delivery_overtime):
     print("\nOvertime dataframe with overtime cost:\n", overtime_summary)
     return overtime_summary
 
-def calculate_overtime_by_route(df_delivery_overtime):
+
+
+def calculate_overtime_from_departure_time(df_control, df_salary_overtime, normal_start_hour=8):
     """
-    Aggregate total overtime cost paid to all workers per route and date.
+    Calculate overtime costs for quoting based on departure time from df_control.
+
+    If departure time ('Hora de salida') is before normal_start_hour, calculate overtime
+    cost for the driver and auxiliaries.
 
     Args:
-        df_delivery_overtime (pd.DataFrame): DataFrame with individual overtime records,
-            must contain 'Ruta', 'Fecha', and 'Total ($)' columns.
+        df_control (pd.DataFrame): Control dataframe with route information including 'Hora de salida'
+        df_salary_overtime (pd.DataFrame): Overtime rates (Hora diurna, Hora nocturna, Hora domingo)
+        normal_start_hour (int): Normal start hour (default 8 for 8:00 AM)
 
     Returns:
-        pd.DataFrame: Aggregated overtime cost per route-date.
+        pd.DataFrame: Overtime summary by route with columns: route_id, date, overtime_cost
     """
-    df = df_delivery_overtime.copy()
-    df['Ruta'] = df['Ruta'].fillna("Especial").astype(str)
+    df = df_control.copy()
+
+    # Ensure date is datetime
     df['Fecha'] = pd.to_datetime(df['Fecha'])
 
-    # Aggregate payments per route-date
-    overtime_summary = (
-        df.groupby(['Ruta', 'Fecha'])['Total ($)']
-        .sum()
-        .reset_index()
-        .rename(columns={
-            'Ruta': 'route_id',
-            'Fecha': 'date',
-            'Total ($)': 'overtime_cost'
-        })
-    )
+    # Ensure Hora de salida is cleaned
+    if 'Hora de salida' in df.columns:
+        df = clean_time_format(df, 'Hora de salida')
+    else:
+        print("Warning: 'Hora de salida' column not found in df_control")
+        # Return empty overtime summary
+        return pd.DataFrame(columns=['route_id', 'date', 'overtime_cost'])
 
-    print("\nOvertime payments aggregated by route:\n", overtime_summary)
-    return overtime_summary
+    # Get average overtime rates for driver and aux
+    # We'll use nighttime rates since early morning (before 8am) is typically night rate
+    driver_overtime_rate = df_salary_overtime[df_salary_overtime['Cargo'] == 'MOTORISTA']['Hora nocturna'].iloc[0] if not df_salary_overtime[df_salary_overtime['Cargo'] == 'MOTORISTA'].empty else 0
+    aux_overtime_rate = df_salary_overtime[df_salary_overtime['Cargo'] == 'DESPACHADOR']['Hora nocturna'].iloc[0] if not df_salary_overtime[df_salary_overtime['Cargo'] == 'DESPACHADOR'].empty else 0
+
+    print(f"Using overtime rates - Driver: ${driver_overtime_rate:.2f}/hr, Aux: ${aux_overtime_rate:.2f}/hr")
+
+    # Calculate overtime for each route
+    overtime_records = []
+
+    grouped = df.groupby(['Ruta (si fue agregado a una ruta)', 'Fecha'])
+
+    for (route_id, date), group in grouped:
+        # Get the departure time (should be same for all rows in a route)
+        departure_times = group['Hora de salida'].dropna()
+
+        if departure_times.empty:
+            continue
+
+        departure_time = departure_times.iloc[0]
+
+        # Check if departure is before normal start hour
+        if isinstance(departure_time, time):
+            departure_hour = departure_time.hour + departure_time.minute / 60.0
+
+            if departure_hour < normal_start_hour:
+                # Calculate overtime hours
+                overtime_hours = normal_start_hour - departure_hour
+
+                # Get number of auxiliaries
+                num_aux = group['Num Auxiliares'].max() if not group['Num Auxiliares'].isna().all() else 2
+
+                # Calculate overtime cost: driver + auxiliaries
+                overtime_cost = (driver_overtime_rate * overtime_hours) + (aux_overtime_rate * overtime_hours * num_aux)
+
+                overtime_records.append({
+                    'route_id': route_id,
+                    'date': date,
+                    'overtime_cost': overtime_cost,
+                    'overtime_hours': overtime_hours,
+                    'departure_time': str(departure_time)
+                })
+
+    if overtime_records:
+        overtime_summary = pd.DataFrame(overtime_records)
+        print("\nOvertime calculated from departure times:\n", overtime_summary)
+    else:
+        overtime_summary = pd.DataFrame(columns=['route_id', 'date', 'overtime_cost'])
+        print("\nNo overtime detected from departure times")
+
+    return overtime_summary[['route_id', 'date', 'overtime_cost']]
 
 
 
@@ -609,10 +726,13 @@ def write_to_excel_with_individual_formatting(output_file, cost_df):
                 worksheet.set_column(8, 8, 18, accounting_format)   # Aux wage
                 worksheet.set_column(9, 9, 18, regular_number_format)  # Number of aux operators
                 worksheet.set_column(10, 10, 18, accounting_format)  # Total gas cost
-                worksheet.set_column(10, 10, 18, accounting_format)  # Total wage cost
-                worksheet.set_column(10, 10, 18, accounting_format)  # Total route cost
-                worksheet.set_column(10, 10, 18, regular_number_format)  # Client portions
-                worksheet.set_column(10, 10, 18, accounting_format)  # Total route price
+                worksheet.set_column(11, 11, 18, accounting_format)  # Total driver cost
+                worksheet.set_column(12, 12, 18, accounting_format)  # Total aux cost
+                worksheet.set_column(13, 13, 18, accounting_format)  # Total wage cost
+                worksheet.set_column(14, 14, 18, accounting_format)  # Total overtime cost
+                worksheet.set_column(15, 15, 18, accounting_format)  # Total route cost
+                worksheet.set_column(16, 16, 18, regular_number_format)  # Client proportion
+                worksheet.set_column(17, 17, 18, accounting_format)  # Price
 
 def filter_data_by_date(df, date_column, start_date, end_date):
     """
@@ -757,8 +877,13 @@ def main():
         "display.expand_frame_repr", False
     )
 
-    start_date_str = "26/09/25"
-    end_date_str = "25/10/2025"
+    # === Configuration ===
+    # Set mode: 'billing' or 'quoting'
+    mode = 'billing'
+    # mode = 'quoting'
+
+    start_date_str = "26/10/25"
+    end_date_str = "25/11/25"
 
     # margin = input("Enter margin as decimal points (e.g. 0.3 for 30%): ")
     # margin = float(margin)
@@ -779,10 +904,11 @@ def main():
         print(e)
         return
 
+    print(f"Main: Running in {mode.upper()} mode")
     print("Main: Loading data...")
 
     # === Load and prepare data ===
-    df_delivery_overtime, df_salary, df_control, df_rutas, df_camiones, df_precios, df_salary_overtime = load_data()
+    df_delivery_overtime, df_salary, df_control, df_rutas, df_camiones, df_precios, df_salary_overtime = load_data(mode=mode)
 
     df_control = filter_data_by_date(df_control, 'Fecha', start_date, end_date)
     df_delivery_overtime = filter_data_by_date(df_delivery_overtime, 'Fecha', start_date, end_date)
@@ -791,9 +917,16 @@ def main():
     df_control = clean_time_format(df_control, 'Hora Fin')
     df_control = assign_special_route(df_control)
 
-    # === Calculate overtime costs ===
-    df_delivery_overtime = cost_calculator(df_delivery_overtime, df_salary_overtime, start_date, end_date)
-    overtime_summary = summarize_overtime_by_route(df_delivery_overtime)
+    # === Calculate overtime costs based on mode ===
+    if mode == 'billing':
+        # Billing mode: use overtime from separate overtime document
+        print("\n=== BILLING MODE: Using overtime from overtime document ===")
+        df_delivery_overtime = cost_calculator(df_delivery_overtime, df_salary_overtime, start_date, end_date)
+        overtime_summary = summarize_overtime_by_route(df_delivery_overtime)
+    else:  # quoting
+        # Quoting mode: calculate overtime from departure time in df_control
+        print("\n=== QUOTING MODE: Calculating overtime from departure times ===")
+        overtime_summary = calculate_overtime_from_departure_time(df_control, df_salary_overtime, normal_start_hour=8)
 
     # === Process route and client data ===
     route_summary_df, client_df = process_control_df(df_control, df_salary, df_camiones, df_precios)
@@ -802,53 +935,69 @@ def main():
     print("route_summary_df: \n", route_summary_df)
     print("overtime_summary: \n", overtime_summary)
 
+    # Check if there are any routes to process
+    if route_summary_df.empty:
+        control_sheet = 'Control de Rutas y Fletes' if mode == 'billing' else 'Costeo'
+        print(f"\n{'='*60}")
+        print(f"WARNING: No routes found for the date range {start_date.date()} to {end_date.date()}")
+        print(f"{'='*60}")
+        print("\nPlease check:")
+        print("  1. The date range is correct")
+        print("  2. Routes exist in the control document for these dates")
+        print(f"  3. The sheet '{control_sheet}' has data for this period")
+        return
+
     route_summary_df = route_summary_df.copy()
     overtime_summary = overtime_summary.copy()
 
-    # CHECKING JOIN COVERAGE:
-    ot_missing, rt_missing, dup_rt, dup_ot = check_join_coverage(route_summary_df, overtime_summary)
-
-    # Bring some context
-    if not ot_missing.empty:
-        print("\n>>> Overtime without Route — with OT amounts")
-        print(
-            overtime_summary
-            .merge(ot_missing, on=['route_id', 'date'], how='inner')
-            .sort_values(['route_id', 'date'])
-        )
-
-    if not rt_missing.empty:
-        print("\n>>> Routes without Overtime — with route names")
-        print(
-            route_summary_df
-            .merge(rt_missing, on=['route_id', 'date'], how='inner')
-            [['route_id', 'date', 'name']]
-            .sort_values(['route_id', 'date'])
-        )
-
-    # 1) route_id → string on both sides (exact same representation)
+    # Normalize keys for merging
     route_summary_df['route_id'] = route_summary_df['route_id'].astype(str).str.strip()
-    overtime_summary['route_id'] = overtime_summary['route_id'].astype(str).str.strip()
-
-    # 2) date → pure date (remove any time component)
     route_summary_df['date'] = pd.to_datetime(route_summary_df['date']).dt.normalize()
-    overtime_summary['date'] = pd.to_datetime(overtime_summary['date']).dt.normalize()
 
-    # Interactively decide whether to proceed when there are gaps
-    if len(ot_missing) or len(rt_missing):
-        proceed = prompt_user_to_continue(
-            overtime_summary=overtime_summary,
-            route_summary_df=route_summary_df,
-            ov_miss=ot_missing,
-            rt_miss=rt_missing,
-            allow_non_interactive=False,  # set True on servers/cron
-            default_continue=False  # default action if non-interactive
-        )
-        if not proceed:
-            print("Aborting by user choice due to data mismatches.")
-            return
+    if not overtime_summary.empty:
+        overtime_summary['route_id'] = overtime_summary['route_id'].astype(str).str.strip()
+        overtime_summary['date'] = pd.to_datetime(overtime_summary['date']).dt.normalize()
 
-    # 3) merge
+    # === JOIN COVERAGE CHECK: Only for billing mode ===
+    if mode == 'billing':
+        print("\n=== BILLING MODE: Checking data consistency between routes and overtime ===")
+        ot_missing, rt_missing, dup_rt, dup_ot = check_join_coverage(route_summary_df, overtime_summary)
+
+        # Bring some context
+        if not ot_missing.empty:
+            print("\n>>> Overtime without Route — with OT amounts")
+            print(
+                overtime_summary
+                .merge(ot_missing, on=['route_id', 'date'], how='inner')
+                .sort_values(['route_id', 'date'])
+            )
+
+        if not rt_missing.empty:
+            print("\n>>> Routes without Overtime — with route names")
+            print(
+                route_summary_df
+                .merge(rt_missing, on=['route_id', 'date'], how='inner')
+                [['route_id', 'date', 'name']]
+                .sort_values(['route_id', 'date'])
+            )
+
+        # Interactively decide whether to proceed when there are gaps
+        if len(ot_missing) or len(rt_missing):
+            proceed = prompt_user_to_continue(
+                overtime_summary=overtime_summary,
+                route_summary_df=route_summary_df,
+                ov_miss=ot_missing,
+                rt_miss=rt_missing,
+                allow_non_interactive=False,  # set True on servers/cron
+                default_continue=False  # default action if non-interactive
+            )
+            if not proceed:
+                print("Aborting by user choice due to data mismatches.")
+                return
+    else:
+        print("\n=== QUOTING MODE: Skipping join coverage check (not applicable) ===")
+
+    # Merge overtime with routes
     route_summary_df = route_summary_df.merge(
         overtime_summary, on=['route_id', 'date'], how='left'
     )
