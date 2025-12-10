@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 import googlemaps
 import numpy as np
 from sklearn.cluster import KMeans
@@ -15,7 +19,7 @@ import folium
 # }
 
 # Initialize Google Maps API client
-gmaps = googlemaps.Client(key='***REMOVED***')
+gmaps = googlemaps.Client(key=os.getenv('GMAPS_API_KEY'))
 
 # Dictionary of all unique locations
 delivery_points = {

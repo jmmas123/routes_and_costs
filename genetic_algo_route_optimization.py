@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 import random
 import numpy as np
 import googlemaps
@@ -6,7 +10,7 @@ from sklearn.cluster import KMeans
 import folium
 
 # Initialize Google Maps API client
-gmaps = googlemaps.Client(key='***REMOVED***')  # Ensure this is your actual Google Maps API key
+gmaps = googlemaps.Client(key=os.getenv('GMAPS_API_KEY'))  # Ensure this is your actual Google Maps API key
 
 # Define delivery points with their geographical coordinates
 delivery_points = {

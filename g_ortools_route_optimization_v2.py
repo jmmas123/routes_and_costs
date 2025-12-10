@@ -4,10 +4,12 @@ from sklearn.cluster import KMeans
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 import folium
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import pandas as pd
 
 # Initialize Google Maps API client
-gmaps = googlemaps.Client(key='***REMOVED***')
+gmaps = googlemaps.Client(key=os.getenv('GMAPS_API_KEY'))
 
 pd.set_option(
     "display.max_rows", None,

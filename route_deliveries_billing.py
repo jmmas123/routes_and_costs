@@ -3,12 +3,14 @@ import googlemaps
 import numpy as np
 import pandas as pd
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from datetime import time
 from datetime import datetime
 import socket
 
 # Initialize Google Maps API client
-gmaps = googlemaps.Client(key='***REMOVED***')
+gmaps = googlemaps.Client(key=os.getenv('GMAPS_API_KEY'))
 
 
 def parse_date(date_str):
